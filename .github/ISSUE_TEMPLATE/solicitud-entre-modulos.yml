@@ -1,0 +1,25 @@
+name: Solicitud entre módulos
+description: Pedir un endpoint, dato, componente o soporte a otro módulo
+labels: ["tipo: solicitud entre módulos"]
+body:
+  - type: dropdown
+    id: solicita
+    attributes:
+      label: Módulo que solicita
+      options: [INTEGRA, CUENTA, ADMIN, BÚSQUEDA, RESERVA, PAGOS, CHECKIN, REPORTES, TRACKING]
+    validations:
+      required: true
+  - type: dropdown
+    id: destino
+    attributes:
+      label: Módulo al que se solicita
+      options: [INTEGRA, CUENTA, ADMIN, BÚSQUEDA, RESERVA, PAGOS, CHECKIN, REPORTES, TRACKING]
+    validations:
+      required: true
+  - type: textarea
+    id: necesidad
+    attributes:
+      label: ¿Qué se necesita?
+      description: Contrato esperado (entrada, salida, estados) y para cuándo
+    validations:
+      required: true
