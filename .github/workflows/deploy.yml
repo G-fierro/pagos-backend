@@ -56,25 +56,45 @@ jobs:
             docker compose pull backend-${{ github.event.workflow_run.head_branch }}
             docker compose up -d backend-${{ github.event.workflow_run.head_branch }}
 
-      - name: Healthcheck del despliegue
-        run: |
-          echo "Esperando 10 segundos a que la aplicación inicie..."
-          sleep 10
-          
-          # Asignar dominio según la rama que detonó el evento
-          BRANCH="${{ github.event.workflow_run.head_branch }}"
-          if [ "$BRANCH" = "main" ]; then
-            URL="https://isoft.lazycat.app"
-          else
-            URL="https://dev.isoft.lazycat.app"
-          fi
+      - name: Despliegue VPS y Healthcheck
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd /home/integracion/banduairlines-infra
+            
+            # 1. Actualiza y reinicia según la rama
+            if [ "${{ github.ref_name }}" = "main" ]; then
+              docker compose pull backend-main
+              docker compose up -d backend-main
+              TARGET_URL="https://isoft.lazycat.app/actuator/health"
+            else
+              docker compose pull backend-develop
+              docker compose up -d backend-develop
+              TARGET_URL="https://dev.isoft.lazycat.app/actuator/health"
+            fi
 
-          echo "Verificando disponibilidad en $URL..."
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$URL" || echo "000")
+            # 2. Espera inicio de Spring Boot (mínimo 25 segundos)
+            echo "Esperando 25 segundos a que la aplicación Spring Boot inicie..."
+            sleep 25
 
-          if [ "$STATUS" -ge 200 ] && [ "$STATUS" -lt 400 ]; then
-            echo "Despliegue verificado con éxito. Código HTTP: $STATUS"
-          else
-            echo "Fallo en la verificación de salud. Código HTTP: $STATUS"
-            exit 1
-          fi
+            # 3. Reintentos de Healthcheck (hasta 5 intentos)
+            SUCCESS=0
+            for i in {1..5}; do
+              echo "Intento $i de verificación en $TARGET_URL..."
+              HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" $TARGET_URL || echo "000")
+              if [ "$HTTP_CODE" -eq 200 ]; then
+                echo "Verificación de salud exitosa (Código HTTP 200)"
+                SUCCESS=1
+                break
+              fi
+              echo "Respuesta HTTP: $HTTP_CODE. Esperando 5 segundos más..."
+              sleep 5
+            done
+
+            if [ $SUCCESS -ne 1 ]; then
+              echo "Fallo en la verificación de salud tras varios intentos."
+              exit 1
+            fi
