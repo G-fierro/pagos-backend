@@ -1,8 +1,13 @@
 name: Backend CD
 
 on:
-  push:
-    branches: [ "main", "develop" ]
+  workflow_run:
+    workflows: ["Backend Pipeline"] 
+    types:
+      - completed
+    branches:
+      - main
+      - develop
 
 env:
   REGISTRY: ghcr.io
@@ -11,6 +16,7 @@ env:
 jobs:
   build-and-deploy:
     name: Construir, Publicar y Desplegar
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -34,7 +40,7 @@ jobs:
           push: true
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.event.workflow_run.head_branch }}
 
       - name: Desplegar en VPS
         uses: appleboy/ssh-action@v1.0.3
@@ -44,15 +50,31 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           known_hosts: ${{ secrets.SSH_KNOWN_HOSTS }}
           script: |
-            # Autenticar el servidor para descargar la imagen privada
-            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ${{ env.REGISTRY }} -u ${{ github.actor }} --password-stdin
-            
-            # Navegar a la carpeta de infraestructura y actualizar solo el backend correspondiente
             cd /home/integracion/banduairlines-infra
             
-            # 3. Usamos github.ref_name para que Compose sepa qué servicio reiniciar
-            docker compose pull backend-${{ github.ref_name }}
-            docker compose up -d backend-${{ github.ref_name }}
-            
-            # Limpiar credenciales
-            docker logout ${{ env.REGISTRY }}
+            # Re-autenticar o asegurar la descarga usando credenciales persistentes
+            docker compose pull backend-${{ github.event.workflow_run.head_branch }}
+            docker compose up -d backend-${{ github.event.workflow_run.head_branch }}
+
+      - name: Healthcheck del despliegue
+        run: |
+          echo "Esperando 10 segundos a que la aplicación inicie..."
+          sleep 10
+          
+          # Asignar dominio según la rama que detonó el evento
+          BRANCH="${{ github.event.workflow_run.head_branch }}"
+          if [ "$BRANCH" = "main" ]; then
+            URL="https://isoft.lazycat.app"
+          else
+            URL="https://dev.isoft.lazycat.app"
+          fi
+
+          echo "Verificando disponibilidad en $URL..."
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$URL" || echo "000")
+
+          if [ "$STATUS" -ge 200 ] && [ "$STATUS" -lt 400 ]; then
+            echo "Despliegue verificado con éxito. Código HTTP: $STATUS"
+          else
+            echo "Fallo en la verificación de salud. Código HTTP: $STATUS"
+            exit 1
+          fi

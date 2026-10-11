@@ -8,13 +8,11 @@ on:
       - develop
       - main
 
-# Cancela ejecuciones en progreso para la misma rama/PR si hay un push nuevo
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  # Etapa de validación de commits
   commit-lint:
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
@@ -34,7 +32,6 @@ jobs:
           npm install -g @commitlint/cli @commitlint/config-conventional
           npx commitlint --from ${{ github.event.pull_request.base.sha }} --to ${{ github.event.pull_request.head.sha }}
 
-  # Fase de compilación de Spring
   compile_backend:
     runs-on: ubuntu-latest
     steps:
@@ -49,4 +46,4 @@ jobs:
           cache: 'maven'
 
       - name: Compile Backend
-        run: mvn clean compile
+        run: mvn clean package -DskipTests
