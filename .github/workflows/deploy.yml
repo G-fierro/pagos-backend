@@ -1,0 +1,80 @@
+name: Backend CD
+
+on:
+  workflow_run:
+    workflows: ["Backend Pipeline"] 
+    types:
+      - completed
+    branches:
+      - main
+      - develop
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: isoft-ufro/banduairlines-backend
+
+jobs:
+  build-and-deploy:
+    name: Construir, Publicar y Desplegar
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Autenticar en ghcr.io
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Construir y subir imagen Docker
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.event.workflow_run.head_branch }}
+
+      - name: Desplegar en VPS
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          known_hosts: ${{ secrets.SSH_KNOWN_HOSTS }}
+          script: |
+            cd /home/integracion/banduairlines-infra
+            
+            # Re-autenticar o asegurar la descarga usando credenciales persistentes
+            docker compose pull backend-${{ github.event.workflow_run.head_branch }}
+            docker compose up -d backend-${{ github.event.workflow_run.head_branch }}
+
+      - name: Healthcheck del despliegue
+        run: |
+          echo "Esperando 10 segundos a que la aplicación inicie..."
+          sleep 10
+          
+          # Asignar dominio según la rama que detonó el evento
+          BRANCH="${{ github.event.workflow_run.head_branch }}"
+          if [ "$BRANCH" = "main" ]; then
+            URL="https://isoft.lazycat.app"
+          else
+            URL="https://dev.isoft.lazycat.app"
+          fi
+
+          echo "Verificando disponibilidad en $URL..."
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$URL" || echo "000")
+
+          if [ "$STATUS" -ge 200 ] && [ "$STATUS" -lt 400 ]; then
+            echo "Despliegue verificado con éxito. Código HTTP: $STATUS"
+          else
+            echo "Fallo en la verificación de salud. Código HTTP: $STATUS"
+            exit 1
+          fi
