@@ -34,7 +34,7 @@ jobs:
           push: true
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }} # 2. Etiquetamos con el nombre de la rama (main o develop) en lugar de 'latest'
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}
 
       - name: Desplegar en VPS
         uses: appleboy/ssh-action@v1.0.3
