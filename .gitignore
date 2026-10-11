@@ -1,4 +1,4 @@
-¡target/
+target/
 .mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
 !**/src/test/**/target/
@@ -33,3 +33,4 @@ build/
 
 ### Env secrets ###
 .env
+/config/

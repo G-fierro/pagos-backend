@@ -1,0 +1,10 @@
+package com.banduairlines.repository;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import com.banduairlines.model.BoletoExtra;
+import com.banduairlines.model.BoletoExtraId;
+
+public interface BoletoExtraRepository extends JpaRepository<BoletoExtra, BoletoExtraId>{
+    
+}
