@@ -8,6 +8,11 @@ on:
       - develop
       - main
 
+# Cancela ejecuciones en progreso para la misma rama/PR si hay un push nuevo
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   # Etapa de validación de commits
   commit-lint:
