@@ -19,6 +19,18 @@ Se elimina cuando lleguen los primeros módulos a `develop`, y siempre antes de 
   * Scopes: `checkin`, `reservas`, `pagos`, `tracking`, `administracion`, `reportes`, `cuentas`, `busqueda`, `integracion`, `core`.
 * **Estructura:** Código en `com.banduairlines`. Controladores y DTOs van en subcarpetas por módulo (`controller/<modulo>/`, `dto/<modulo>/`; módulos: admin, busqueda, checkin, cuenta, integra, pagos, reportes, reserva, tracking); `service/`, `service/impl/` y `repository/` sin subcarpetas. Ejemplo de referencia en `controller/integra/AeropuertoController`.
 
+| Módulo | Carpeta (`controller/`, `dto/`) | Scope de commit |
+|---|---|---|
+| Integración | `integra` | `integracion`, `core` |
+| Cuentas y Fidelización | `cuenta` | `cuentas` |
+| Administración | `admin` | `administracion` |
+| Búsqueda y Disponibilidad | `busqueda` | `busqueda` |
+| Compra y Reserva | `reserva` | `reservas` |
+| Pagos y Transacciones | `pagos` | `pagos` |
+| Gestión del Viaje (Check-in) | `checkin` | `checkin` |
+| Estadísticas (Reportes) | `reportes` | `reportes` |
+| Seguimiento Operativo (Tracking) | `tracking` | `tracking` |
+
 ## 3. Seguridad y Rutas
 * **Solicitar ruta pública:** Enviar un Pull Request modificando `SecurityRoutes.java` (`PUBLICAS` o `PUBLICAS_GET`).
 * **Tracking:** Consulta de pasajero en `/api/v1/tracking/**` (requiere autenticación JWT, no es pública). Gestión en `/api/v1/admin/tracking/**` (solo `ADMINISTRADOR`).
@@ -98,3 +110,41 @@ UsuarioAutenticado usuario = usuarioActual.exigir();
 * **Comportamiento:** Se crea automáticamente al arrancar la aplicación si el usuario no existe con rol `ADMINISTRADOR` (nunca sobrescribe credenciales de usuarios existentes ni registra contraseñas en los logs).
 * **Despliegue:** El Compose de producción (`banduairlines-infra`) debe pasar estas variables de entorno al contenedor backend.
 
+## 9. Arquitectura de Módulos y Entidades (Modelos Spring Boot)
+
+El desarrollo del backend está organizado en 9 módulos lógicos. A continuación se detalla la responsabilidad de cada uno y las entidades (`@Entity`) que soportan su persistencia en la base de datos:
+
+**Módulo 1: INTEGRA (Integración):** Base del proyecto. Coordina convenciones de código, configuraciones globales (incluido CORS para desarrollo local en `CorsConfig`; en producción no hace falta porque frontend y API comparten dominio), CI/CD, esquemas de seguridad base y despliegue.
+
+**Módulo 2: CUENTA (Cuentas y Fidelización):** Maneja la seguridad JWT, la gestión de perfiles y el programa de lealtad. *Modelos base:*
+* **Usuario:** Credenciales, roles y datos personales.
+* **CuentaFidelizacion:** Extensión del usuario (`@MapsId`) para controlar saldo y nivel (Básico, Plata, Oro, Platino).
+* **MovimientoMilla:** Bitácora que registra acumulaciones por vuelos volados, canjes o expiración de millas.
+
+**Módulo 3: ADMIN (Administración):** Backoffice para la definición estática de la aerolínea (física y comercial). *Modelos base:*
+* **Infraestructura:** `Aeropuerto`, `Avion` (aeronave), `Asiento` (mapeo del fuselaje) y `Ruta` (conexiones origen-destino).
+* **Comercial:** `PackTarifario` (reglas de tarifas) y `Extra` (catálogo de servicios adicionales).
+
+**Módulo 4: BUSQUEDA (Búsqueda y Disponibilidad):** Motor principal que cruza rutas, fechas y asientos disponibles. *Modelos base:*
+* **Vuelo:** Instancia de una `Ruta` operada por un `Avion` en un horario específico.
+* **TarifaVuelo:** Tabla pivote que cruza un `Vuelo` específico con un `PackTarifario` y una `ClaseCabina`, estableciendo el precio dinámico.
+
+**Módulo 5: RESERVA (Compra y Reserva):** Gestión del carrito de compras, asignación de pasajeros a tramos y cálculo total. *Modelos base:*
+* **Reserva:** Entidad cabecera (código alfanumérico único de 6 caracteres) que consolida subtotales, descuentos y el estado del carrito.
+* **Pasajero:** Detalles legales y etarios de cada viajero asociado a la reserva.
+* **Boleto:** Asocia un `pasajero` a un tramo (`Vuelo`), asignando su `tarifa` y, opcionalmente, su asiento.
+* **BoletoExtra:** Entidad intermedia (con clave compuesta `@EmbeddedId`) que registra los servicios adicionales comprados (ej. 2 maletas extra).
+* **Promocion:** Códigos de descuento validados durante el proceso.
+
+**Módulo 6: PAGOS (Pagos y Transacciones):** Integración exclusiva con *Flow.cl*. Recibe el requerimiento de pago desde el módulo `RESERVA`. *Modelos base:*
+* **Pago:** Bitácora transaccional que almacena el token de *Flow*, la orden, el medio de pago utilizado y guarda el payload crudo (JSON) de la respuesta del banco para auditoría.
+
+**Módulo 7: CHECKIN (Gestión del Viaje):** Permite buscar reservas confirmadas, validar restricciones de tiempo (48h a 1h) y emitir la documentación de vuelo. *Modelos base:*
+* **TarjetaEmbarque:** Relación estricta 1 a 1 (`@MapsId`) con un `Boleto`. Genera el código QR/alfanumérico final y registra la puerta de embarque.
+
+**Módulo 8: REPORTES (Estadísticas):** Panel de métricas del negocio (ocupación de vuelos, ingresos por rutas, ventas de extras). *Modelos base:*
+* **Módulo de lectura (Read-Only):** Realiza consultas complejas (proyecciones y agregaciones DTO) sobre Reservas, Pagos, Vuelos y Boletos.
+* **Implementación:** Utiliza los repositorios de `Reserva`, `Pago`, `Vuelo` y `Boleto` inyectados en su capa de servicio. Ejecuta consultas JPQL o nativas (`GROUP BY`, `SUM`, `COUNT`) utilizando las marcas de tiempo existentes (`created_at`, `fecha_pago`, `salida_programada`) para generar agrupaciones temporales (diarias, semanales, mensuales, anuales). Los resultados se mapean directamente a objetos **DTO** para ser consumidos por el frontend.
+
+**Módulo 9: TRACKING (Seguimiento Operativo):** Monitoreo de la operación de la aerolínea. Los pasajeros consultan el estado de sus vuelos en `/api/v1/tracking/**` (requiere autenticación) y los administradores actualizan los estados (*Embarcando*, *En Vuelo*, *Retrasado*) en `/api/v1/admin/tracking/**`. *Modelos base:*
+* **SeguimientoVuelo:** Historial inmutable que registra qué administrador cambió el estado de un vuelo, la marca de tiempo y las observaciones (ej. "Retraso por clima").

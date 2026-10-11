@@ -25,7 +25,7 @@ import com.banduairlines.model.Vuelo;
 import com.banduairlines.model.enums.ClaseCabina;
 import com.banduairlines.model.enums.Estado;
 import com.banduairlines.model.enums.EstadoVuelo;
-import com.banduairlines.repository.AeronaveRepository;
+import com.banduairlines.repository.AvionRepository;
 import com.banduairlines.repository.AeropuertoRepository;
 import com.banduairlines.repository.AsientoRepository;
 import com.banduairlines.repository.PackTarifarioRepository;
@@ -41,7 +41,7 @@ public class DataSeeder implements ApplicationRunner {
 
     private final AeropuertoRepository aeropuertoRepository;
     private final RutaRepository rutaRepository;
-    private final AeronaveRepository aeronaveRepository;
+    private final AvionRepository aeronaveRepository;
     private final AsientoRepository asientoRepository;
     private final PackTarifarioRepository packTarifarioRepository;
     private final VueloRepository vueloRepository;
@@ -49,7 +49,7 @@ public class DataSeeder implements ApplicationRunner {
 
     public DataSeeder(AeropuertoRepository aeropuertoRepository,
                       RutaRepository rutaRepository,
-                      AeronaveRepository aeronaveRepository,
+                      AvionRepository aeronaveRepository,
                       AsientoRepository asientoRepository,
                       PackTarifarioRepository packTarifarioRepository,
                       VueloRepository vueloRepository,
