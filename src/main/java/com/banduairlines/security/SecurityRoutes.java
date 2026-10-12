@@ -10,6 +10,8 @@ public final class SecurityRoutes {
     /** Públicas para cualquier método HTTP. */
     public static final String[] PUBLICAS = {
             API + "/health",                  // INTEGRA: endpoint de salud
+            "/actuator/health",               // INTEGRA: healthcheck del despliegue (Actuator)
+            "/actuator/health/**",
             API + "/auth/**",                 // CUENTA: login y registro
             API + "/pagos/notificaciones"     // PAGOS: callback servidor-a-servidor de Flow (no trae token)
     };
