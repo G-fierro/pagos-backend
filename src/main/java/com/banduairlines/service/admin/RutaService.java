@@ -6,7 +6,7 @@ import com.banduairlines.dto.admin.RutaRespuesta;
 import com.banduairlines.dto.admin.RutaSolicitud;
 
 
-public interface RutaServicio {
+public interface RutaService {
     Page<RutaRespuesta> listar(
         Boolean activa,
         int pagina,
