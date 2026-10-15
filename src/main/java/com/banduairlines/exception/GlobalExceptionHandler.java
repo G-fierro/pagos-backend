@@ -14,6 +14,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
+import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -85,6 +86,12 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(AuthenticationException.class)
     public ResponseEntity<ApiError> noAutenticado(AuthenticationException e, HttpServletRequest req) {
         return responder(HttpStatus.UNAUTHORIZED, CodigosError.NO_AUTENTICADO, "Credenciales inválidas o autenticación requerida", req, List.of());
+    }
+
+    /** La lanzan los servicios con un motivo propio (p. ej. RESERVA cuando falta el X-Compra-Token). */
+    @ExceptionHandler(AuthenticationCredentialsNotFoundException.class)
+    public ResponseEntity<ApiError> credencialesFaltantes(AuthenticationCredentialsNotFoundException e, HttpServletRequest req) {
+        return responder(HttpStatus.UNAUTHORIZED, CodigosError.NO_AUTENTICADO, e.getMessage(), req, List.of());
     }
 
     @ExceptionHandler(AccessDeniedException.class)

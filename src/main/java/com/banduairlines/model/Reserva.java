@@ -23,7 +23,8 @@ public class Reserva {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "codigo_reserva", nullable = false, unique = true, length = 6)
+    // Se asigna al iniciar el pago (ReservaPagoServiceImpl); mientras la compra está EN_CURSO es null.
+    @Column(name = "codigo_reserva", unique = true, length = 6)
     private String codigoReserva; 
 
     @ManyToOne(fetch = FetchType.LAZY)
