@@ -21,7 +21,6 @@ import com.banduairlines.repository.ReservaRepository;
 import com.banduairlines.service.reserva.CalculadoraTotalReserva;
 import com.banduairlines.service.reserva.ReservaAcceso;
 import com.banduairlines.service.reserva.ReservaPromocionService;
-
 @Service
 @Transactional
 public class ReservaPromocionServiceImpl implements ReservaPromocionService {
