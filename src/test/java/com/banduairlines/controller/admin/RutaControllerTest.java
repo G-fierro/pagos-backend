@@ -13,6 +13,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import com.banduairlines.exception.ConflictoException;
 
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -103,5 +104,38 @@ class RutaControllerTest {
                         "$.details[?(@.campo == 'activa')]").exists());
 
         verifyNoInteractions(servicio);
+    }
+
+    @Test
+    void actualizarDevuelveConflictoSiLaRutaTieneVuelos() throws Exception {
+        RutaSolicitud solicitud = new RutaSolicitud(
+                1L, 3L, 700, 90, true);
+
+        when(servicio.actualizar(10L, solicitud))
+                .thenThrow(
+                        new ConflictoException(
+                                "No se puede cambiar el recorrido "
+                                        + "de una ruta con vuelos asociados")
+                                .conCodigo("RUTA_CON_VUELOS_ASOCIADOS"));
+
+        mockMvc.perform(put("/api/v1/admin/rutas/10")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {
+                            "origenId": 1,
+                            "destinoId": 3,
+                            "distanciaKm": 700,
+                            "duracionMin": 90,
+                            "activa": true
+                        }
+                        """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.status").value(409))
+                .andExpect(jsonPath("$.code")
+                        .value("RUTA_CON_VUELOS_ASOCIADOS"))
+                .andExpect(jsonPath("$.path")
+                        .value("/api/v1/admin/rutas/10"));
+
+        verify(servicio).actualizar(10L, solicitud);
     }
 }
