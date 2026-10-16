@@ -34,44 +34,40 @@ class RutaServiceImplTest {
     @Test
     void actualizarRechazaCambiarRecorridoSiLaRutaTieneVuelos() {
         Aeropuerto origen = Aeropuerto.builder()
-            .id(1L)
-            .build();
+                .id(1L)
+                .build();
 
         Aeropuerto destino = Aeropuerto.builder()
-            .id(2L)
-            .build();
+                .id(2L)
+                .build();
 
         Ruta ruta = Ruta.builder()
-            .id(10L)
-            .origen(origen)
-            .destino(destino)
-            .distanciaKm(620)
-            .duracionMin(85)
-            .activa(true)
-            .build();
+                .id(10L)
+                .origen(origen)
+                .destino(destino)
+                .distanciaKm(620)
+                .duracionMin(85)
+                .activa(true)
+                .build();
 
         when(rutas.findById(10L))
-            .thenReturn(Optional.of(ruta));
+                .thenReturn(Optional.of(ruta));
 
         when(rutas.contarVuelosAsociados(10L))
-            .thenReturn(1L);
+                .thenReturn(1L);
 
         RutaSolicitud solicitud = new RutaSolicitud(
-            1L,
-            3L,
-            700,
-            90,
-            true
-        );
+                1L,
+                3L,
+                700,
+                90,
+                true);
 
-        assertThatThrownBy(() ->
-            servicio.actualizar(10L, solicitud)
-        )
-            .isInstanceOfSatisfying(
-                ConflictoException.class,
-                excepcion -> assertThat(excepcion.getCodigo())
-                    .isEqualTo("RUTA_CON_VUELOS_ASOCIADOS")
-            );
+        assertThatThrownBy(() -> servicio.actualizar(10L, solicitud))
+                .isInstanceOfSatisfying(
+                        ConflictoException.class,
+                        excepcion -> assertThat(excepcion.getCodigo())
+                                .isEqualTo("RUTA_CON_VUELOS_ASOCIADOS"));
 
         assertThat(ruta.getOrigen().getId()).isEqualTo(1L);
         assertThat(ruta.getDestino().getId()).isEqualTo(2L);
@@ -80,5 +76,62 @@ class RutaServiceImplTest {
 
         verify(rutas, never()).saveAndFlush(any(Ruta.class));
         verifyNoInteractions(aeropuertos);
+    }
+
+    @Test
+    void actualizarPermiteModificarDatosSinCambiarRecorrido() {
+        Aeropuerto origen = Aeropuerto.builder()
+                .id(1L)
+                .codigoIata("SCL")
+                .ciudad("Santiago")
+                .build();
+
+        Aeropuerto destino = Aeropuerto.builder()
+                .id(2L)
+                .codigoIata("ZCO")
+                .ciudad("Temuco")
+                .build();
+
+        Ruta ruta = Ruta.builder()
+                .id(10L)
+                .origen(origen)
+                .destino(destino)
+                .distanciaKm(620)
+                .duracionMin(85)
+                .activa(true)
+                .build();
+
+        when(rutas.findById(10L))
+                .thenReturn(Optional.of(ruta));
+
+        when(aeropuertos.findById(1L))
+                .thenReturn(Optional.of(origen));
+
+        when(aeropuertos.findById(2L))
+                .thenReturn(Optional.of(destino));
+
+        when(rutas.saveAndFlush(any(Ruta.class)))
+                .thenReturn(ruta);
+
+        RutaSolicitud solicitud = new RutaSolicitud(
+                1L,
+                2L,
+                630,
+                90,
+                true);
+
+        var respuesta = servicio.actualizar(10L, solicitud);
+
+        assertThat(respuesta.id()).isEqualTo(10L);
+        assertThat(respuesta.origenId()).isEqualTo(1L);
+        assertThat(respuesta.destinoId()).isEqualTo(2L);
+        assertThat(respuesta.distanciaKm()).isEqualTo(630);
+        assertThat(respuesta.duracionMin()).isEqualTo(90);
+
+        verify(rutas).contarDuplicadasAdministracion(1L, 2L, 10L);
+        verify(rutas).saveAndFlush(ruta);
+
+        // Si el recorrido no cambia, no hace falta contar los vuelos.
+        verify(rutas, never()).contarVuelosAsociados(any());
     }
 }
