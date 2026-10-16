@@ -50,10 +50,20 @@ public class RutaServiceImpl implements RutaService {
 
     @Override
     @Transactional
-    public RutaRespuesta actualizar(
-            Long id, RutaSolicitud solicitud) {
-
+    public RutaRespuesta actualizar(Long id, RutaSolicitud solicitud) {
         Ruta ruta = buscarRuta(id);
+
+        boolean cambiaRecorrido = !ruta.getOrigen().getId().equals(solicitud.origenId())
+                || !ruta.getDestino().getId().equals(solicitud.destinoId());
+
+        if (cambiaRecorrido && rutas.contarVuelosAsociados(id) > 0) {
+            throw new ConflictoException(
+                    "No se puede cambiar el origen o destino "
+                            + "de una ruta con vuelos asociados. "
+                            + "Crea una nueva ruta para el nuevo recorrido.")
+                    .conCodigo("RUTA_CON_VUELOS_ASOCIADOS");
+        }
+
         validarSolicitud(solicitud, id);
         asignarDatos(ruta, solicitud);
 
