@@ -54,6 +54,11 @@ public class GlobalExceptionHandler {
         return responder(HttpStatus.BAD_GATEWAY, e.getCodigo(), "Falla temporal al comunicarse con un servicio externo", req, List.of());
     }
 
+    @ExceptionHandler(RecursoVencidoException.class)
+    public ResponseEntity<ApiError> recursoVencido(RecursoVencidoException e, HttpServletRequest req) {
+        return responder(HttpStatus.GONE, e.getCodigo(), e.getMessage(), req, List.of());
+    }
+
     // ---------- Validación y peticiones mal formadas (400) ----------
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -64,6 +69,11 @@ public class GlobalExceptionHandler {
         e.getBindingResult().getGlobalErrors()
                 .forEach(g -> detalles.add(new DetalleError(g.getObjectName(), g.getDefaultMessage())));
         return responder(HttpStatus.BAD_REQUEST, CodigosError.VALIDACION, "Los datos enviados no son válidos", req, detalles);
+    }
+
+    @ExceptionHandler(ValidacionException.class)
+    public ResponseEntity<ApiError> validacionNegocio(ValidacionException e, HttpServletRequest req) {
+        return responder(HttpStatus.BAD_REQUEST, CodigosError.VALIDACION, e.getMessage(), req, List.of());
     }
 
     @ExceptionHandler(ConstraintViolationException.class)

@@ -31,7 +31,7 @@ public class CuentaFidelizacion {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     @Builder.Default
-    private Nivel nivel = Nivel.BASICO; 
+    private Nivel nivel = Nivel.BRONCE;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
