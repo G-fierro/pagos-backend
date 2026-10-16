@@ -134,4 +134,66 @@ class RutaServiceImplTest {
         // Si el recorrido no cambia, no hace falta contar los vuelos.
         verify(rutas, never()).contarVuelosAsociados(any());
     }
+
+    @Test
+    void actualizarPermiteCambiarRecorridoSiNoHayVuelos() {
+        Aeropuerto origen = Aeropuerto.builder()
+                .id(1L)
+                .codigoIata("SCL")
+                .ciudad("Santiago")
+                .build();
+
+        Aeropuerto destinoAnterior = Aeropuerto.builder()
+                .id(2L)
+                .build();
+
+        Aeropuerto destinoNuevo = Aeropuerto.builder()
+                .id(3L)
+                .codigoIata("CCP")
+                .ciudad("Concepción")
+                .build();
+
+        Ruta ruta = Ruta.builder()
+                .id(10L)
+                .origen(origen)
+                .destino(destinoAnterior)
+                .distanciaKm(620)
+                .duracionMin(85)
+                .activa(true)
+                .build();
+
+        when(rutas.findById(10L))
+                .thenReturn(Optional.of(ruta));
+
+        when(rutas.contarVuelosAsociados(10L))
+                .thenReturn(0L);
+
+        when(aeropuertos.findById(1L))
+                .thenReturn(Optional.of(origen));
+
+        when(aeropuertos.findById(3L))
+                .thenReturn(Optional.of(destinoNuevo));
+
+        when(rutas.saveAndFlush(any(Ruta.class)))
+                .thenReturn(ruta);
+
+        RutaSolicitud solicitud = new RutaSolicitud(
+                1L,
+                3L,
+                430,
+                60,
+                true);
+
+        var respuesta = servicio.actualizar(10L, solicitud);
+
+        assertThat(respuesta.origenId()).isEqualTo(1L);
+        assertThat(respuesta.destinoId()).isEqualTo(3L);
+        assertThat(respuesta.destinoCodigoIata()).isEqualTo("CCP");
+        assertThat(respuesta.distanciaKm()).isEqualTo(430);
+        assertThat(respuesta.duracionMin()).isEqualTo(60);
+
+        verify(rutas).contarVuelosAsociados(10L);
+        verify(rutas).contarDuplicadasAdministracion(1L, 3L, 10L);
+        verify(rutas).saveAndFlush(ruta);
+    }
 }
