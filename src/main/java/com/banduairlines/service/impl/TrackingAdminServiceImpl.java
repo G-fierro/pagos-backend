@@ -37,11 +37,7 @@ public class TrackingAdminServiceImpl implements TrackingAdminService {
     @Override
     @Transactional
     public SeguimientoVueloResponse actualizarEstadoVuelo(Long vueloId, ActualizarEstadoRequest request) {
-        if ((request.getNuevoEstado() == EstadoVuelo.RETRASADO || request.getNuevoEstado() == EstadoVuelo.CANCELADO)
-                && (request.getMotivo() == null || request.getMotivo().trim().isEmpty())) {
-            throw new ReglaNegocioException("Debe proporcionar un motivo para estados RETRASADO o CANCELADO")
-                    .conCodigo("MOTIVO_REQUERIDO");
-        }
+        validarInformacionContextual(request);
 
         Vuelo vuelo = vueloRepository.findById(vueloId)
                 .orElseThrow(() -> new RecursoNoEncontradoException("No existe el vuelo con ID: " + vueloId));
@@ -57,11 +53,13 @@ public class TrackingAdminServiceImpl implements TrackingAdminService {
         Usuario admin = usuarioRepository.findById(adminId)
                 .orElseThrow(() -> new RecursoNoEncontradoException("Administrador no encontrado con ID: " + adminId));
 
+        String observacionContextual = construirObservacionContextual(request);
+
         SeguimientoVuelo nuevoSeguimiento = SeguimientoVuelo.builder()
                 .vuelo(vuelo)
                 .estado(request.getNuevoEstado())
                 .retrasoMinutos(request.getRetrasoMinutos() != null ? request.getRetrasoMinutos() : 0)
-                .observacion(request.getMotivo())
+                .observacion(observacionContextual)
                 .registradoPor(admin)
                 .build();
 
@@ -77,6 +75,47 @@ public class TrackingAdminServiceImpl implements TrackingAdminService {
                 admin.getId(),
                 guardado.getRegistradoEn()
         );
+    }
+
+    private void validarInformacionContextual(ActualizarEstadoRequest request) {
+        EstadoVuelo estado = request.getNuevoEstado();
+
+        if (estado == EstadoVuelo.RETRASADO) {
+            boolean faltaMotivo = (request.getMotivo() == null || request.getMotivo().trim().isEmpty())
+                    && (request.getDescripcion() == null || request.getDescripcion().trim().isEmpty());
+            if (faltaMotivo) {
+                throw new ReglaNegocioException("Debe adjuntar el motivo o justificación del retraso")
+                        .conCodigo("MOTIVO_REQUERIDO");
+            }
+            if (request.getRetrasoMinutos() == null || request.getRetrasoMinutos() <= 0) {
+                throw new ReglaNegocioException("Para registrar un retraso debe indicar los minutos estimados mayores a cero")
+                        .conCodigo("RETRASO_INVALIDO");
+            }
+        }
+
+        if (estado == EstadoVuelo.CANCELADO) {
+            boolean faltaMotivo = (request.getMotivo() == null || request.getMotivo().trim().isEmpty())
+                    && (request.getDescripcion() == null || request.getDescripcion().trim().isEmpty());
+            if (faltaMotivo) {
+                throw new ReglaNegocioException("Debe adjuntar el motivo o justificación de la cancelación del vuelo")
+                        .conCodigo("MOTIVO_REQUERIDO");
+            }
+        }
+    }
+
+    private String construirObservacionContextual(ActualizarEstadoRequest request) {
+        String motivo = request.getMotivo() != null ? request.getMotivo().trim() : "";
+        String desc = request.getDescripcion() != null ? request.getDescripcion().trim() : "";
+
+        if (!motivo.isEmpty() && !desc.isEmpty()) {
+            String combinada = "[" + motivo + "] " + desc;
+            return combinada.length() > 255 ? combinada.substring(0, 255) : combinada;
+        } else if (!motivo.isEmpty()) {
+            return motivo.length() > 255 ? motivo.substring(0, 255) : motivo;
+        } else if (!desc.isEmpty()) {
+            return desc.length() > 255 ? desc.substring(0, 255) : desc;
+        }
+        return null;
     }
 
     private void validarTransicion(EstadoVuelo actual, EstadoVuelo nuevo) {

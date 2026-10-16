@@ -23,7 +23,6 @@ public class SeguimientoVueloResponse {
     }
 
     public SeguimientoVueloResponse(Long idSeguimiento, Long vueloId, String codigoVuelo,EstadoVuelo estadoActual, Integer retrasoMinutos,String observacion, Long registradoPorId,LocalDateTime registradoEn) {
-       
         this.idSeguimiento = idSeguimiento;
         this.vueloId = vueloId;
         this.codigoVuelo = codigoVuelo;
