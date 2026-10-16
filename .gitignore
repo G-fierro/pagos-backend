@@ -34,3 +34,5 @@ build/
 ### Env secrets ###
 .env
 /config/
+
+/.agents

@@ -1,0 +1,133 @@
+package com.banduairlines.controller.pagos;
+
+import com.banduairlines.dto.pagos.*;
+import com.banduairlines.exception.GlobalExceptionHandler;
+import com.banduairlines.exception.RecursoNoEncontradoException;
+import com.banduairlines.model.enums.EstadoPago;
+import com.banduairlines.service.pagos.PagoService;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+
+import java.time.Instant;
+import java.util.List;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+
+@ExtendWith(MockitoExtension.class)
+class BoletaControllerTest {
+
+    private MockMvc mockMvc;
+
+    @Mock
+    private PagoService pagoService;
+
+    @InjectMocks
+    private BoletaController boletaController;
+
+    private BoletaResponse boletaEjemplo;
+
+    @BeforeEach
+    void setUp() {
+        mockMvc = MockMvcBuilders.standaloneSetup(boletaController)
+                .setControllerAdvice(new GlobalExceptionHandler())
+                .build();
+
+        EmisorDto emisor = new EmisorDto(
+                "BANDUAIRLINES SpA", "76.543.210-8", "Transporte Aéreo", "Av. Francisco Salazar 01145", "+56 2 2946 3300"
+        );
+        ReceptorDto receptor = new ReceptorDto("Javiera Fernanda Muñoz Soto", "18.245.673-4");
+        PagoBoletaDto pagoBoleta = new PagoBoletaDto(EstadoPago.PAGADO, new MedioPagoDto("Tarjeta de Crédito Visa", "4521"), 3849571L, Instant.now());
+        List<LineaBoletaDto> lineas = List.of(new LineaBoletaDto("TARIFA", "Tarifa Light x 1 adulto", 255320));
+
+        boletaEjemplo = new BoletaResponse(
+                1021L, 2458731L, emisor, Instant.now(), "VENTA_WEB", 5310L, "K7QX2M",
+                receptor, List.of("Javiera Fernanda Muñoz Soto"), lineas, 0, 255320, pagoBoleta
+        );
+    }
+
+    @Test
+    void obtenerBoletaPorReserva_cuandoExiste_retorna200() throws Exception {
+        when(pagoService.obtenerBoletaPorReserva(eq(5310L), any())).thenReturn(boletaEjemplo);
+
+        mockMvc.perform(get("/api/v1/pagos/reservas/5310/boleta"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.boletaId").value(1021L))
+                .andExpect(jsonPath("$.numeroBoleta").value(2458731L))
+                .andExpect(jsonPath("$.codigoReserva").value("K7QX2M"))
+                .andExpect(jsonPath("$.totalCLP").value(255320));
+    }
+
+    @Test
+    void obtenerBoletaPorReserva_cuandoNoExiste_retorna404() throws Exception {
+        when(pagoService.obtenerBoletaPorReserva(eq(999L), any()))
+                .thenThrow(new RecursoNoEncontradoException("Boleta no encontrada").conCodigo("BOLETA_NO_ENCONTRADA"));
+
+        mockMvc.perform(get("/api/v1/pagos/reservas/999/boleta"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("BOLETA_NO_ENCONTRADA"));
+    }
+
+    @Test
+    void obtenerHistorial_retorna200ConPagina() throws Exception {
+        BoletaResumenResponse resumen = new BoletaResumenResponse(
+                1021L, 2458731L, "K7QX2M", Instant.now(), 255320
+        );
+        PaginaResponse<BoletaResumenResponse> pagina = new PaginaResponse<>(
+                List.of(resumen), 0, 10, 1L, 1
+        );
+        when(pagoService.obtenerHistorialBoletas(0, 10)).thenReturn(pagina);
+
+        mockMvc.perform(get("/api/v1/pagos/boletas/historial")
+                        .param("pagina", "0")
+                        .param("tamano", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.contenido[0].boletaId").value(1021L))
+                .andExpect(jsonPath("$.totalElementos").value(1));
+    }
+
+    @Test
+    void descargarBoletaPdf_retornaPdfConHeadersCorrectos() throws Exception {
+        byte[] pdfFake = "%PDF-1.4 Fake PDF bytes".getBytes();
+        when(pagoService.obtenerBoletaPorId(1021L)).thenReturn(boletaEjemplo);
+        when(pagoService.generarBoletaPdf(eq(1021L), any())).thenReturn(pdfFake);
+
+        mockMvc.perform(get("/api/v1/pagos/boletas/1021/pdf"))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_PDF_VALUE))
+                .andExpect(header().string(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"boleta-2458731.pdf\""))
+                .andExpect(content().bytes(pdfFake));
+    }
+
+    @Test
+    void consultarBoletaInvitado_cuandoDatosCoinciden_retorna200() throws Exception {
+        when(pagoService.consultarBoletaInvitado(any(ConsultaBoletaInvitadoRequest.class)))
+                .thenReturn(boletaEjemplo);
+
+        String json = """
+                {
+                    "codigoReserva": "K7QX2M",
+                    "correo": "javiera@test.com"
+                }
+                """;
+
+        mockMvc.perform(post("/api/v1/pagos/boletas/consulta")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.numeroBoleta").value(2458731L))
+                .andExpect(jsonPath("$.codigoReserva").value("K7QX2M"));
+    }
+}
