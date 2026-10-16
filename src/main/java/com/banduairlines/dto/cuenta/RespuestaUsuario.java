@@ -1,6 +1,5 @@
 package com.banduairlines.dto.cuenta;
 
-import com.banduairlines.model.enums.Nivel;
 import com.banduairlines.model.enums.RolUsuario;
 
 public record RespuestaUsuario(
@@ -9,6 +8,6 @@ public record RespuestaUsuario(
         String apellidos,
         String correo,
         RolUsuario rol,
-        Nivel nivel
+        String nivel
 ) {
 }

@@ -9,6 +9,8 @@ import com.banduairlines.service.cuenta.GestionNivelService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
+
 @Service
 public class GestionNivelServiceImpl implements GestionNivelService {
 
@@ -36,7 +38,7 @@ public class GestionNivelServiceImpl implements GestionNivelService {
         if (millas >= millasMinimasPlata) {
             return Nivel.PLATA;
         }
-        return Nivel.BRONCE;
+        return Nivel.BASICO;
     }
 
     @Override
@@ -46,17 +48,22 @@ public class GestionNivelServiceImpl implements GestionNivelService {
         }
         validarConfiguracion();
 
-        long millasMinimas = switch (nivel) {
-            case BRONCE -> 0L;
-            case PLATA -> millasMinimasPlata;
-            case ORO -> millasMinimasOro;
+        return switch (nivel) {
+            case BASICO -> new ConfiguracionNivel("BRONCE", 0L, BigDecimal.ONE);
+            case PLATA -> new ConfiguracionNivel(
+                    "PLATA",
+                    millasMinimasPlata,
+                    new BigDecimal("1.2")
+            );
+            case ORO -> new ConfiguracionNivel(
+                    "ORO",
+                    millasMinimasOro,
+                    new BigDecimal("1.5")
+            );
+            case PLATINO -> throw new ValidacionException(
+                    "PLATINO no forma parte de los niveles gestionados por Cuentas"
+            );
         };
-
-        return new ConfiguracionNivel(
-                nivel,
-                millasMinimas,
-                nivel.getMultiplicadorPuntos()
-        );
     }
 
     private void validarConfiguracion() {

@@ -53,7 +53,7 @@ public class RegistroPasajeroServiceImpl implements RegistroPasajeroService {
         CuentaFidelizacion cuenta = CuentaFidelizacion.builder()
                 .usuario(usuario)
                 .saldoMillas(0)
-                .nivel(Nivel.BRONCE)
+                .nivel(Nivel.BASICO)
                 .build();
 
         usuario.setCuentaFidelizacion(cuenta);
