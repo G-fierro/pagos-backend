@@ -10,12 +10,6 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 
-<<<<<<< HEAD
-=======
-/**
- * Solicitud para crear o actualizar un código promocional (RF-08).
- */
->>>>>>> 42ac198cde31e8f942d25a7888192c17f4dcdb7a
 public record PromocionSolicitud(
         @NotBlank(message = "El código es obligatorio")
         @Size(max = 30, message = "El código no puede superar los 30 caracteres")

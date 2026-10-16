@@ -22,13 +22,6 @@ import com.banduairlines.service.admin.PromocionService;
 
 import jakarta.validation.Valid;
 
-<<<<<<< HEAD
-=======
-/**
- * Endpoints del módulo Administración para configurar los códigos promocionales
- * (RF-08). Solo accesible para el rol ADMINISTRADOR.
- */
->>>>>>> 42ac198cde31e8f942d25a7888192c17f4dcdb7a
 @RestController
 @RequestMapping("/api/v1/admin/promociones")
 public class PromocionController {

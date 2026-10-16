@@ -15,12 +15,6 @@ import com.banduairlines.model.Promocion;
 import com.banduairlines.repository.PromocionRepository;
 import com.banduairlines.service.admin.PromocionService;
 
-<<<<<<< HEAD
-=======
-/**
- * Implementación del servicio de gestión de códigos promocionales (RF-08).
- */
->>>>>>> 42ac198cde31e8f942d25a7888192c17f4dcdb7a
 @Service
 @Transactional
 public class PromocionServiceImpl implements PromocionService {
