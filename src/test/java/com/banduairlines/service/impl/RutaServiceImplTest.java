@@ -11,6 +11,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import com.banduairlines.exception.ReglaNegocioException;
 
 import java.util.Optional;
 
@@ -195,5 +196,40 @@ class RutaServiceImplTest {
         verify(rutas).contarVuelosAsociados(10L);
         verify(rutas).contarDuplicadasAdministracion(1L, 3L, 10L);
         verify(rutas).saveAndFlush(ruta);
+    }
+
+    @Test
+    void crearRechazaOrigenIgualAlDestino() {
+        RutaSolicitud solicitud = new RutaSolicitud(
+                1L,
+                1L,
+                100,
+                60,
+                true);
+
+        assertThatThrownBy(() -> servicio.crear(solicitud))
+                .isInstanceOf(ReglaNegocioException.class);
+
+        verify(rutas, never()).saveAndFlush(any(Ruta.class));
+        verifyNoInteractions(aeropuertos);
+    }
+
+    @Test
+    void crearRechazaRutaDuplicada() {
+        when(rutas.contarDuplicadasAdministracion(1L, 2L, null))
+                .thenReturn(1L);
+
+        RutaSolicitud solicitud = new RutaSolicitud(
+                1L,
+                2L,
+                620,
+                85,
+                true);
+
+        assertThatThrownBy(() -> servicio.crear(solicitud))
+                .isInstanceOf(ConflictoException.class);
+
+        verify(rutas, never()).saveAndFlush(any(Ruta.class));
+        verifyNoInteractions(aeropuertos);
     }
 }
