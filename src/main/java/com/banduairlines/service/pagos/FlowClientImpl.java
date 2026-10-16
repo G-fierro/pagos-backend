@@ -2,6 +2,7 @@ package com.banduairlines.service.pagos;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
@@ -29,12 +30,16 @@ public class FlowClientImpl implements FlowClient {
     private final String apiUrl;
     private final RestClient restClient;
 
+    @Autowired
     public FlowClientImpl(
             @Value("${bandu.flow.api-key:}") String apiKey,
             @Value("${bandu.flow.secret-key:}") String secretKey,
-            @Value("${bandu.flow.api-url:https://sandbox.flow.cl/api}") String apiUrl,
-            RestClient.Builder restClientBuilder
+            @Value("${bandu.flow.api-url:https://sandbox.flow.cl/api}") String apiUrl
     ) {
+        this(apiKey, secretKey, apiUrl, RestClient.builder());
+    }
+
+    FlowClientImpl(String apiKey, String secretKey, String apiUrl, RestClient.Builder restClientBuilder) {
         this.apiKey = apiKey;
         this.secretKey = secretKey;
         this.apiUrl = apiUrl.endsWith("/") ? apiUrl.substring(0, apiUrl.length() - 1) : apiUrl;

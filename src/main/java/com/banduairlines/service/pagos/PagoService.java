@@ -18,17 +18,15 @@ public interface PagoService {
 
     BoletaResponse obtenerBoletaPorReserva(Long reservaId, String compraToken);
 
-    PaginaResponse<BoletaResumenResponse> obtenerHistorialBoletas(int pagina, int tamano);
+    PaginaResponse<BoletaResumenResponse> obtenerHistorialBoletas(int pagina, int tamano,
+                                                                  LocalDate desde, LocalDate hasta,
+                                                                  String codigoReserva);
 
     BoletaResponse obtenerBoletaPorId(Long boletaId);
 
-    byte[] generarBoletaPdf(Long boletaId, String compraToken);
+    BoletaPdfDto generarBoletaPdf(Long boletaId, String compraToken);
 
     BoletaResponse consultarBoletaInvitado(ConsultaBoletaInvitadoRequest request);
-
-    ResumenPagosResponse obtenerResumenReportes(LocalDate desde, LocalDate hasta);
-
-    PaginaResponse<PagoRegistroResponse> obtenerPagosReportes(LocalDate desde, LocalDate hasta, int pagina, int tamano);
 
     boolean tienePagoEnEspera(Long reservaId);
 }

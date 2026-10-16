@@ -2,6 +2,7 @@ package com.banduairlines.service.pagos;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
@@ -22,11 +23,15 @@ public class ReservasNotificationClient {
     private final String serviceKey;
     private final String baseUrl;
 
+    @Autowired
     public ReservasNotificationClient(
             @Value("${bandu.internas.service-key:clave_compartida_reservas}") String serviceKey,
-            @Value("${bandu.reservas.url:http://localhost:8080}") String baseUrl,
-            RestClient.Builder restClientBuilder
+            @Value("${bandu.reservas.url:http://localhost:8080}") String baseUrl
     ) {
+        this(serviceKey, baseUrl, RestClient.builder());
+    }
+
+    ReservasNotificationClient(String serviceKey, String baseUrl, RestClient.Builder restClientBuilder) {
         this.serviceKey = serviceKey;
         this.baseUrl = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
         this.restClient = restClientBuilder.baseUrl(this.baseUrl).build();
@@ -49,6 +54,9 @@ public class ReservasNotificationClient {
         } catch (HttpClientErrorException e) {
             log.warn("Reservas respondió con error de cliente {} al notificar resultado: {}",
                     e.getStatusCode(), e.getResponseBodyAsString());
+            if (e.getStatusCode().value() == 401) {
+                log.error("ALERTA: Reservas rechazó la X-Service-Key de Pagos (401); revisar la clave compartida");
+            }
             String errorCode = extraerCodigoError(e.getResponseBodyAsString(), e.getStatusCode());
             return new ReservasNotificacionResult(false, e.getStatusCode().value(), errorCode, e.getMessage());
         } catch (HttpServerErrorException e) {
@@ -56,9 +64,9 @@ public class ReservasNotificationClient {
             throw new ServicioExternoException("Reservas falló al recibir la confirmación de pago", e)
                     .conCodigo("SERVICIO_EXTERNO");
         } catch (Exception e) {
-            log.warn("No fue posible conectar con Reservas (módulo no desplegado o caído): {}", e.getMessage());
-            // Si el backend es monolito y reservas aún no implementa el endpoint, permitimos simulación en dev
-            return new ReservasNotificacionResult(true, 200, null, "Simulación exitosa en desarrollo");
+            log.error("No fue posible conectar con Reservas: {}", e.getMessage());
+            throw new ServicioExternoException("No fue posible comunicarse con Reservas", e)
+                    .conCodigo("SERVICIO_EXTERNO");
         }
     }
 

@@ -4,6 +4,8 @@ import com.banduairlines.dto.pagos.*;
 import com.banduairlines.exception.ConflictoException;
 import com.banduairlines.exception.RecursoNoEncontradoException;
 import com.banduairlines.exception.ReglaNegocioException;
+import com.banduairlines.exception.ServicioExternoException;
+import jakarta.validation.ConstraintViolationException;
 import com.banduairlines.model.Pago;
 import com.banduairlines.model.Reserva;
 import com.banduairlines.model.Usuario;
@@ -18,6 +20,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageImpl;
@@ -72,8 +75,7 @@ class PagoServiceTest {
                 flowClient,
                 reservasNotificationClient,
                 boletaPdfGenerator,
-                usuarioActual,
-                objectMapper
+                usuarioActual
         );
         ReflectionTestUtils.setField(pagoService, "configuredServiceKey", serviceKey);
         ReflectionTestUtils.setField(pagoService, "flowUrlConfirmacion", "http://localhost:8080/api/v1/pagos/notificaciones");
@@ -229,7 +231,7 @@ class PagoServiceTest {
     @Test
     void consultarBoletaInvitado_cuandoCodigoOCorreoNoCoinciden_lanza404() {
         Reserva reserva = Reserva.builder().id(1L).codigoReserva("K7QX2M").emailContacto("correcto@test.com").build();
-        when(reservaRepository.findAll()).thenReturn(List.of(reserva));
+        when(reservaRepository.findByCodigoReservaIgnoreCase("K7QX2M")).thenReturn(Optional.of(reserva));
 
         ConsultaBoletaInvitadoRequest req = new ConsultaBoletaInvitadoRequest("K7QX2M", "incorrecto@test.com");
         RecursoNoEncontradoException ex = assertThrows(RecursoNoEncontradoException.class, () ->
@@ -241,46 +243,285 @@ class PagoServiceTest {
     void generarBoletaPdf_generaDocumentoPdfValido() {
         Reserva reserva = Reserva.builder().id(1L).codigoReserva("K7QX2M").build();
         Pago pago = Pago.builder().id(10L).reserva(reserva).estado(EstadoPago.PAGADO).monto(BigDecimal.valueOf(255320)).build();
+        pago.setDetalleRespuesta(detalleConBoleta(10L, 255320));
 
         when(pagoRepository.findById(10L)).thenReturn(Optional.of(pago));
         when(reservaAcceso.obtenerAutorizada(eq(1L), any())).thenReturn(reserva);
 
-        ReservaParaPago reservaInfo = new ReservaParaPago(
-                1L, "K7QX2M", EstadoReserva.CONFIRMADA, Instant.now(),
-                new ContactoDto("Javiera", "javiera@test.com", "1234"),
-                List.of(new PasajeroCompraDto(1L, "Javiera", "Muñoz")),
-                new TotalReservaDto(List.of(new LineaCompraDto("TARIFA", "Vuelo", 255320)), 0, 255320)
-        );
-        when(reservaConsultaInterna.obtenerParaPago(1L)).thenReturn(reservaInfo);
+        BoletaPdfDto pdf = pagoService.generarBoletaPdf(10L, "TOKEN-INVITADO");
 
-        byte[] pdf = pagoService.generarBoletaPdf(10L, null);
-
-        assertNotNull(pdf);
-        assertTrue(pdf.length > 100);
-        String header = new String(pdf, 0, 8);
+        assertEquals(2000010L, pdf.numeroBoleta());
+        assertNotNull(pdf.contenido());
+        assertTrue(pdf.contenido().length > 100);
+        String header = new String(pdf.contenido(), 0, 8);
         assertTrue(header.startsWith("%PDF-1.4"), "El PDF debe iniciar con la cabecera estándar %PDF-1.4");
+        String texto = new String(pdf.contenido(), java.nio.charset.StandardCharsets.ISO_8859_1);
+        assertTrue(texto.contains("Javiera Mu"), "El PDF muestra el receptor");
+        assertFalse(texto.contains("RUT"), "La boleta no lleva RUT del emisor ni del receptor");
+        verify(reservaAcceso).obtenerAutorizada(1L, "TOKEN-INVITADO");
+        verifyNoInteractions(usuarioActual);
     }
 
     @Test
-    void obtenerResumenReportes_calculaTotalesYTicketPromedioCorrectamente() {
-        Pago p1 = Pago.builder().id(1L).estado(EstadoPago.PAGADO).monto(BigDecimal.valueOf(100000)).medioPago("Tarjeta de Crédito Visa").fechaPago(LocalDateTime.now()).build();
-        Pago p2 = Pago.builder().id(2L).estado(EstadoPago.PAGADO).monto(BigDecimal.valueOf(200000)).medioPago("Tarjeta de Crédito Visa").fechaPago(LocalDateTime.now()).build();
-        Pago p3 = Pago.builder().id(3L).estado(EstadoPago.RECHAZADO).monto(BigDecimal.valueOf(50000)).fechaPago(LocalDateTime.now()).build();
+    void generarBoletaPdf_sinBoletaGuardada_lanza404SinReconstruir() {
+        Reserva reserva = Reserva.builder().id(1L).codigoReserva("K7QX2M").build();
+        Pago pago = Pago.builder().id(10L).reserva(reserva).estado(EstadoPago.PAGADO).monto(BigDecimal.valueOf(255320)).build();
+        when(pagoRepository.findById(10L)).thenReturn(Optional.of(pago));
+        when(reservaAcceso.obtenerAutorizada(eq(1L), any())).thenReturn(reserva);
 
-        when(pagoRepository.findByRangoFechas(any(), any())).thenReturn(List.of(p1, p2, p3));
-
-        ResumenPagosResponse resumen = pagoService.obtenerResumenReportes(LocalDate.now().minusDays(5), LocalDate.now());
-
-        assertNotNull(resumen);
-        assertEquals(2, resumen.cantidadPagos());
-        assertEquals(300000L, resumen.montoTotalCLP());
-        assertEquals(150000L, resumen.ticketPromedioCLP());
-        assertEquals(1, resumen.cantidadRechazados());
-        assertEquals(1, resumen.porMedioPago().size());
-        assertEquals("Tarjeta de Crédito Visa", resumen.porMedioPago().get(0).medioPago());
-        assertEquals(2, resumen.porMedioPago().get(0).cantidadPagos());
-        assertEquals(300000L, resumen.porMedioPago().get(0).montoTotalCLP());
+        RecursoNoEncontradoException ex = assertThrows(RecursoNoEncontradoException.class,
+                () -> pagoService.generarBoletaPdf(10L, null));
+        assertEquals("BOLETA_NO_ENCONTRADA", ex.getCodigo());
+        verifyNoInteractions(reservaConsultaInterna);
     }
+
+    @Test
+    void procesarNotificacionFlow_sinToken_lanzaValidacion() {
+        assertThrows(ConstraintViolationException.class, () -> pagoService.procesarNotificacionFlow(" "));
+        assertThrows(ConstraintViolationException.class, () -> pagoService.procesarNotificacionFlow(null));
+    }
+
+    @Test
+    void procesarNotificacionFlow_pagado_guardaBoletaInmutableConDatosDeFlow() {
+        Reserva reserva = Reserva.builder().id(1L).codigoReserva("K7QX2M").build();
+        Pago pago = Pago.builder().id(10L).reserva(reserva).flowToken("TOKEN_OK").monto(BigDecimal.valueOf(255320)).estado(EstadoPago.PENDIENTE).build();
+        when(pagoRepository.findByFlowToken("TOKEN_OK")).thenReturn(Optional.of(pago));
+        when(flowClient.obtenerEstadoPago("TOKEN_OK")).thenReturn(new FlowPaymentStatusResponse(
+                5555L, "PAGO-10", 2, 255320, "CLP", "cliente@test.com",
+                new FlowPaymentStatusResponse.PaymentData("2026-09-26 20:52:00", "webpay",
+                        new FlowPaymentStatusResponse.CardData("credit", "Visa", "9876"))));
+        when(reservaConsultaInterna.obtenerParaPago(1L)).thenReturn(reservaPagada());
+        when(reservasNotificationClient.notificarResultado(eq(1L), any(ResultadoPagoRequest.class)))
+                .thenReturn(new ReservasNotificationClient.ReservasNotificacionResult(true, 200, null, "OK"));
+
+        pagoService.procesarNotificacionFlow("TOKEN_OK");
+
+        when(reservaAcceso.obtenerAutorizada(eq(1L), any())).thenReturn(reserva);
+        when(pagoRepository.findFirstByReservaIdAndEstadoOrderByIdDesc(1L, EstadoPago.PAGADO)).thenReturn(Optional.of(pago));
+        BoletaResponse boleta = pagoService.obtenerBoletaPorReserva(1L, null);
+
+        assertEquals(10L, boleta.boletaId());
+        assertEquals(2000010L, boleta.numeroBoleta());
+        assertEquals("9876", boleta.pago().medioPago().ultimosDigitos());
+        assertEquals("Tarjeta de Crédito Visa", boleta.pago().medioPago().nombre());
+        assertEquals(5555L, boleta.pago().ordenFlow());
+        assertEquals("Javiera Fernanda Muñoz Soto", boleta.receptor());
+        // 20:52 en Chile (UTC-3 en septiembre) son las 23:52 UTC, y esa es también la fecha de emisión.
+        assertEquals(Instant.parse("2026-09-26T23:52:00Z"), boleta.pago().fechaPago());
+        assertEquals(boleta.pago().fechaPago(), boleta.fechaEmision());
+        assertEquals(LocalDateTime.of(2026, 9, 26, 23, 52), pago.getFechaPago());
+        assertEquals(255320, boleta.totalCLP());
+    }
+
+    @Test
+    void procesarNotificacionFlow_cuandoFlowSigueEnEspera_noNotificaAReservas() {
+        Reserva reserva = Reserva.builder().id(1L).codigoReserva("K7QX2M").build();
+        Pago pago = Pago.builder().id(10L).reserva(reserva).flowToken("TOKEN_P").monto(BigDecimal.valueOf(1000)).estado(EstadoPago.PENDIENTE).build();
+        when(pagoRepository.findByFlowToken("TOKEN_P")).thenReturn(Optional.of(pago));
+        when(flowClient.obtenerEstadoPago("TOKEN_P")).thenReturn(new FlowPaymentStatusResponse(
+                5555L, "PAGO-10", 1, 1000, "CLP", "cliente@test.com", null));
+
+        pagoService.procesarNotificacionFlow("TOKEN_P");
+
+        assertEquals(EstadoPago.PENDIENTE, pago.getEstado());
+        assertNull(pago.getFechaPago());
+        verifyNoInteractions(reservasNotificationClient);
+    }
+
+    @Test
+    void procesarNotificacionFlow_rechazado_notificaUnaSolaVezAunqueFlowRepita() {
+        Reserva reserva = Reserva.builder().id(1L).codigoReserva("K7QX2M").build();
+        Pago pago = Pago.builder().id(10L).reserva(reserva).flowToken("TOKEN_R").monto(BigDecimal.valueOf(1000)).estado(EstadoPago.PENDIENTE).build();
+        when(pagoRepository.findByFlowToken("TOKEN_R")).thenReturn(Optional.of(pago));
+        when(flowClient.obtenerEstadoPago("TOKEN_R")).thenReturn(new FlowPaymentStatusResponse(
+                5555L, "PAGO-10", 3, 1000, "CLP", "cliente@test.com", null));
+        when(reservasNotificationClient.notificarResultado(eq(1L), any(ResultadoPagoRequest.class)))
+                .thenReturn(new ReservasNotificationClient.ReservasNotificacionResult(true, 200, null, "OK"));
+
+        pagoService.procesarNotificacionFlow("TOKEN_R");
+        pagoService.procesarNotificacionFlow("TOKEN_R");
+
+        assertEquals(EstadoPago.RECHAZADO, pago.getEstado());
+        // fechaPago es el momento en que Flow confirmó el pago: un rechazo no la tiene.
+        assertNull(pago.getFechaPago());
+        verify(reservasNotificationClient, times(1)).notificarResultado(eq(1L), any(ResultadoPagoRequest.class));
+    }
+
+    @Test
+    void procesarNotificacionFlow_cuandoReservasFalla5xx_noModificaElPago() {
+        Reserva reserva = Reserva.builder().id(1L).codigoReserva("K7QX2M").build();
+        Pago pago = Pago.builder().id(10L).reserva(reserva).flowToken("TOKEN_5XX").monto(BigDecimal.valueOf(255320)).estado(EstadoPago.PENDIENTE).build();
+        when(pagoRepository.findByFlowToken("TOKEN_5XX")).thenReturn(Optional.of(pago));
+        when(flowClient.obtenerEstadoPago("TOKEN_5XX")).thenReturn(new FlowPaymentStatusResponse(
+                5555L, "PAGO-10", 2, 255320, "CLP", "cliente@test.com", null));
+        when(reservaConsultaInterna.obtenerParaPago(1L)).thenReturn(reservaPagada());
+        when(reservasNotificationClient.notificarResultado(eq(1L), any(ResultadoPagoRequest.class)))
+                .thenThrow(new ServicioExternoException("Reservas caído", new RuntimeException()));
+
+        assertThrows(ServicioExternoException.class, () -> pagoService.procesarNotificacionFlow("TOKEN_5XX"));
+
+        assertEquals(EstadoPago.PENDIENTE, pago.getEstado());
+        assertNull(pago.getDetalleRespuesta());
+        assertNull(pago.getFechaPago());
+    }
+
+    @Test
+    void procesarNotificacionFlow_cuandoReservaCancelada_devuelveCobroUnaSolaVezYNoEmiteBoleta() {
+        Reserva reserva = Reserva.builder().id(1L).codigoReserva("K7QX2M").emailContacto("contacto@test.com").build();
+        Pago pago = Pago.builder().id(10L).reserva(reserva).flowToken("TOKEN_CANC").flowOrder(5555L).monto(BigDecimal.valueOf(255320)).estado(EstadoPago.PENDIENTE).build();
+        when(pagoRepository.findByFlowToken("TOKEN_CANC")).thenReturn(Optional.of(pago));
+        when(flowClient.obtenerEstadoPago("TOKEN_CANC")).thenReturn(new FlowPaymentStatusResponse(
+                5555L, "PAGO-10", 2, 255320, "CLP", "pagador@test.com",
+                new FlowPaymentStatusResponse.PaymentData("2026-09-26 20:52:00", "webpay",
+                        new FlowPaymentStatusResponse.CardData("credit", "Visa", "4521"))));
+        when(reservaConsultaInterna.obtenerParaPago(1L)).thenReturn(reservaPagada());
+        when(reservasNotificationClient.notificarResultado(eq(1L), any(ResultadoPagoRequest.class)))
+                .thenReturn(new ReservasNotificationClient.ReservasNotificacionResult(false, 409, "ESTADO_INVALIDO", "cancelada"));
+        when(flowClient.crearReembolso(eq("REF-10"), eq("pagador@test.com"), eq(255320), anyString(), eq(5555L)))
+                .thenReturn(new FlowRefundResponse("refund", 777L, "2026-09-27", "created", 255320, "REF_TOKEN_1"));
+
+        pagoService.procesarNotificacionFlow("TOKEN_CANC");
+        // Flow vuelve a avisar: no debe reprocesar ni pedir otro reembolso.
+        pagoService.procesarNotificacionFlow("TOKEN_CANC");
+
+        assertEquals(EstadoPago.PENDIENTE, pago.getEstado());
+        assertNull(pago.getFechaPago());
+        // Un pago devuelto por Flow sigue PENDIENTE y no expone medio de pago.
+        assertNull(pago.getMedioPago());
+        when(pagoRepository.findById(10L)).thenReturn(Optional.of(pago));
+        assertNull(pagoService.obtenerPago(10L, null).medioPago());
+        assertTrue(pago.getDetalleRespuesta().contains("\"sinReserva\":true"));
+        assertTrue(pago.getDetalleRespuesta().contains("\"motivo\":\"ESTADO_INVALIDO\""));
+        assertTrue(pago.getDetalleRespuesta().contains("\"token\":\"REF_TOKEN_1\""));
+        assertTrue(pago.getDetalleRespuesta().contains("\"flowRefundOrder\":777"));
+        assertFalse(pago.getDetalleRespuesta().contains("\"boleta\""));
+        verify(flowClient, times(1)).crearReembolso(anyString(), anyString(), anyInt(), anyString(), anyLong());
+        verify(reservasNotificationClient, times(1)).notificarResultado(eq(1L), any(ResultadoPagoRequest.class));
+    }
+
+    @Test
+    void procesarNotificacionFlow_cuandoMontoDifierePeroNoEstaPagado_noDevuelve() {
+        Reserva reserva = Reserva.builder().id(1L).build();
+        Pago pago = Pago.builder().id(10L).reserva(reserva).flowToken("TOKEN_X").monto(BigDecimal.valueOf(255320)).estado(EstadoPago.PENDIENTE).build();
+        when(pagoRepository.findByFlowToken("TOKEN_X")).thenReturn(Optional.of(pago));
+        when(flowClient.obtenerEstadoPago("TOKEN_X")).thenReturn(new FlowPaymentStatusResponse(
+                5555L, "PAGO-10", 1, 200000, "CLP", "cliente@test.com", null));
+
+        pagoService.procesarNotificacionFlow("TOKEN_X");
+
+        verify(flowClient, never()).crearReembolso(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void procesarNotificacionReembolso_actualizaEstadoDelReembolso() {
+        Reserva reserva = Reserva.builder().id(1L).build();
+        Pago pago = Pago.builder().id(10L).reserva(reserva).estado(EstadoPago.PENDIENTE).build();
+        pago.setDetalleRespuesta("{\"sinReserva\":true,\"reembolso\":{\"token\":\"REF_TOKEN_1\",\"estado\":\"created\"}}");
+        when(pagoRepository.findByReembolsoToken("REF_TOKEN_1")).thenReturn(Optional.of(pago));
+        when(flowClient.obtenerEstadoReembolso("REF_TOKEN_1"))
+                .thenReturn(new FlowRefundResponse("refund", 777L, "2026-09-27", "accepted", 255320, "REF_TOKEN_1"));
+
+        pagoService.procesarNotificacionReembolso("REF_TOKEN_1");
+
+        assertEquals(EstadoPago.PENDIENTE, pago.getEstado());
+        assertTrue(pago.getDetalleRespuesta().contains("\"estado\":\"accepted\""));
+        assertTrue(pago.getDetalleRespuesta().contains("\"token\":\"REF_TOKEN_1\""));
+        assertTrue(pago.getDetalleRespuesta().contains("\"sinReserva\":true"));
+        verify(pagoRepository).save(pago);
+    }
+
+    @Test
+    void procesarNotificacionReembolso_validaToken() {
+        assertThrows(ConstraintViolationException.class, () -> pagoService.procesarNotificacionReembolso(null));
+
+        when(pagoRepository.findByReembolsoToken("DESCONOCIDO")).thenReturn(Optional.empty());
+        RecursoNoEncontradoException ex = assertThrows(RecursoNoEncontradoException.class,
+                () -> pagoService.procesarNotificacionReembolso("DESCONOCIDO"));
+        assertEquals("PAGO_NO_ENCONTRADO", ex.getCodigo());
+    }
+
+    @Test
+    void obtenerHistorialBoletas_armaElResumenConColumnasYAplicaFiltros() {
+        when(usuarioActual.exigir()).thenReturn(new UsuarioAutenticado(7L, "ana@test.com", RolUsuario.PASAJERO));
+        Reserva reserva = Reserva.builder().id(1L).codigoReserva("K7QX2M").build();
+        Pago pago = Pago.builder().id(10L).reserva(reserva).estado(EstadoPago.PAGADO)
+                .monto(BigDecimal.valueOf(255320)).fechaPago(LocalDateTime.of(2026, 9, 27, 0, 52)).build();
+        when(pagoRepository.findPagadosByUsuarioId(eq(7L), any(), any(), anyString(), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(pago)));
+
+        PaginaResponse<BoletaResumenResponse> pagina = pagoService.obtenerHistorialBoletas(
+                0, 10, LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 30), " k7qx2m ");
+
+        assertEquals(1, pagina.contenido().size());
+        BoletaResumenResponse item = pagina.contenido().get(0);
+        assertEquals(10L, item.boletaId());
+        assertEquals(2000010L, item.numeroBoleta());
+        assertEquals("K7QX2M", item.codigoReserva());
+        assertEquals(Instant.parse("2026-09-27T00:52:00Z"), item.fechaEmision());
+        assertEquals(255320, item.totalCLP());
+
+        // El rango se interpreta en America/Santiago: septiembre empieza a las 03:00 UTC (UTC-3) y
+        // termina el 1 de octubre a las 02:59:59 UTC (ya rige UTC-3 tras el cambio de hora de septiembre).
+        ArgumentCaptor<LocalDateTime> desde = ArgumentCaptor.forClass(LocalDateTime.class);
+        ArgumentCaptor<LocalDateTime> hasta = ArgumentCaptor.forClass(LocalDateTime.class);
+        verify(pagoRepository).findPagadosByUsuarioId(eq(7L), desde.capture(), hasta.capture(), eq("K7QX2M"), any(Pageable.class));
+        assertEquals(LocalDateTime.of(2026, 9, 1, 4, 0), desde.getValue());
+        assertTrue(hasta.getValue().isAfter(LocalDateTime.of(2026, 10, 1, 2, 59)));
+        assertTrue(hasta.getValue().isBefore(LocalDateTime.of(2026, 10, 1, 3, 1)));
+    }
+
+    @Test
+    void obtenerHistorialBoletas_sinFiltros_usaLimitesAmplios() {
+        when(usuarioActual.exigir()).thenReturn(new UsuarioAutenticado(7L, "ana@test.com", RolUsuario.PASAJERO));
+        when(pagoRepository.findPagadosByUsuarioId(eq(7L), any(), any(), anyString(), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of()));
+
+        pagoService.obtenerHistorialBoletas(0, 10, null, null, null);
+
+        ArgumentCaptor<LocalDateTime> desde = ArgumentCaptor.forClass(LocalDateTime.class);
+        ArgumentCaptor<LocalDateTime> hasta = ArgumentCaptor.forClass(LocalDateTime.class);
+        verify(pagoRepository).findPagadosByUsuarioId(eq(7L), desde.capture(), hasta.capture(), eq("%"), any(Pageable.class));
+        assertTrue(desde.getValue().isBefore(LocalDateTime.of(2000, 1, 1, 0, 0)));
+        assertTrue(hasta.getValue().isAfter(LocalDateTime.of(3000, 1, 1, 0, 0)));
+    }
+
+    @Test
+    void obtenerHistorialBoletas_validaTamanoYRol() {
+        when(usuarioActual.exigir()).thenReturn(new UsuarioAutenticado(7L, "ana@test.com", RolUsuario.PASAJERO));
+        assertThrows(ConstraintViolationException.class, () -> pagoService.obtenerHistorialBoletas(0, 51, null, null, null));
+        assertThrows(ConstraintViolationException.class, () -> pagoService.obtenerHistorialBoletas(-1, 10, null, null, null));
+        assertThrows(ConstraintViolationException.class, () -> pagoService.obtenerHistorialBoletas(
+                0, 10, LocalDate.of(2026, 10, 2), LocalDate.of(2026, 10, 1), null));
+
+        when(usuarioActual.exigir()).thenReturn(new UsuarioAutenticado(1L, "admin@test.com", RolUsuario.ADMINISTRADOR));
+        assertThrows(org.springframework.security.access.AccessDeniedException.class,
+                () -> pagoService.obtenerHistorialBoletas(0, 10, null, null, null));
+    }
+
+    private ReservaParaPago reservaPagada() {
+        return new ReservaParaPago(
+                1L, "K7QX2M", EstadoReserva.PENDIENTE_PAGO, Instant.now().plusSeconds(600),
+                new ContactoDto("Javiera Fernanda Muñoz Soto", "javiera@test.com", "1234"),
+                List.of(new PasajeroCompraDto(1L, "Javiera Fernanda", "Muñoz Soto")),
+                new TotalReservaDto(List.of(new LineaCompraDto("TARIFA", "Tarifa Light × 1 adulto", 255320)), 0, 255320)
+        );
+    }
+
+    private String detalleConBoleta(Long pagoId, int total) {
+        try {
+            BoletaResponse boleta = new BoletaResponse(
+                    pagoId, 2000000L + pagoId,
+                    Instant.parse("2026-09-27T00:52:00Z"), "VENTA_WEB", 1L, "K7QX2M",
+                    "Javiera Muñoz", List.of("Javiera Muñoz"),
+                    List.of(new LineaBoletaDto("TARIFA", "Tarifa Light × 1 adulto", total)), 0, total,
+                    new PagoBoletaDto(EstadoPago.PAGADO, new MedioPagoDto("Tarjeta de Crédito Visa", "4521"), 3849571L,
+                            Instant.parse("2026-09-27T00:52:00Z")));
+            return objectMapper.writeValueAsString(java.util.Map.of("boleta", boleta));
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
 
     @Test
     void procesarRetornoFlow_conFrontendUrlConfigurada_redirigeAlFrontendAbsoluto() {
