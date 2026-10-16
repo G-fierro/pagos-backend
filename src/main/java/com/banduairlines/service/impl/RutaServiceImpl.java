@@ -17,6 +17,9 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
+import java.util.Locale;
+import java.util.Locale;
+import org.springframework.data.domain.Pageable;
 
 @Service
 @RequiredArgsConstructor
@@ -139,6 +142,54 @@ public class RutaServiceImpl implements RutaService {
                 ruta.getDistanciaKm(),
                 ruta.getDuracionMin(),
                 ruta.getActiva());
+    }
+
+    @Override
+    public Page<RutaRespuesta> buscar(
+            Boolean activa, String texto, int pagina, int tamano) {
+
+        validarPaginacion(pagina, tamano);
+
+        var paginacion = PageRequest.of(
+                pagina,
+                tamano,
+                Sort.by("id").ascending());
+
+        return rutas.buscarAdministracion(
+                activa,
+                prepararPatron(texto),
+                paginacion)
+                .map(this::convertirRespuesta);
+    }
+
+    @Override
+    public List<RutaRespuesta> buscarTodas(
+            Boolean activa, String texto) {
+
+        var sinPaginacion = Pageable.unpaged(
+                Sort.by("id").ascending());
+
+        return rutas.buscarAdministracion(
+                activa,
+                prepararPatron(texto),
+                sinPaginacion)
+                .getContent()
+                .stream()
+                .map(this::convertirRespuesta)
+                .toList();
+    }
+
+    private String prepararPatron(String texto) {
+        String normalizado = texto == null
+                ? ""
+                : texto.strip().toLowerCase(Locale.ROOT);
+
+        String escapado = normalizado
+                .replace("!", "!!")
+                .replace("%", "!%")
+                .replace("_", "!_");
+
+        return "%" + escapado + "%";
     }
 
 }

@@ -37,22 +37,35 @@ import lombok.RequiredArgsConstructor;
 public class RutaController {
     private final RutaService servicio;
 
-    @GetMapping
-    public Page<RutaRespuesta> listar(@RequestParam(defaultValue = "0") int pagina,
-            @RequestParam(defaultValue = "20") int tamano, @RequestParam(required = false) Boolean activa) {
-        return servicio.listar(activa, pagina, tamano);
-    }
-
     @GetMapping("/{id}")
     public RutaRespuesta obtener(@PathVariable @Positive Long id) {
         return servicio.obtener(id);
     }
 
+    @GetMapping
+    public Page<RutaRespuesta> listar(
+            @RequestParam(defaultValue = "0") int pagina,
+            @RequestParam(defaultValue = "20") int tamano,
+            @RequestParam(required = false) Boolean activa,
+            @RequestParam(required = false) String buscar) {
+
+        if (buscar == null || buscar.isBlank()) {
+            return servicio.listar(activa, pagina, tamano);
+        }
+
+        return servicio.buscar(activa, buscar, pagina, tamano);
+    }
+
     @GetMapping("/todas")
     public List<RutaRespuesta> listarTodas(
-            @RequestParam(required = false) Boolean activa) {
+            @RequestParam(required = false) Boolean activa,
+            @RequestParam(required = false) String buscar) {
 
-        return servicio.listarTodas(activa);
+        if (buscar == null || buscar.isBlank()) {
+            return servicio.listarTodas(activa);
+        }
+
+        return servicio.buscarTodas(activa, buscar);
     }
 
     @PostMapping
@@ -74,5 +87,4 @@ public class RutaController {
 
         return servicio.cambiarEstado(id, solicitud.activa());
     }
-
 }
