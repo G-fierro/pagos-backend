@@ -18,8 +18,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.Locale;
-import java.util.Locale;
 import org.springframework.data.domain.Pageable;
+import com.banduairlines.model.enums.EstadoVuelo;
 
 @Service
 @RequiredArgsConstructor
@@ -69,6 +69,7 @@ public class RutaServiceImpl implements RutaService {
         }
 
         validarSolicitud(solicitud, id);
+        validarDesactivacion(ruta, solicitud.activa());
         asignarDatos(ruta, solicitud);
 
         return convertirRespuesta(rutas.saveAndFlush(ruta));
@@ -78,7 +79,11 @@ public class RutaServiceImpl implements RutaService {
     @Transactional
     public RutaRespuesta cambiarEstado(Long id, boolean activa) {
         Ruta ruta = buscarRuta(id);
+
+        validarDesactivacion(ruta, activa);
+
         ruta.setActiva(activa);
+
         return convertirRespuesta(rutas.saveAndFlush(ruta));
     }
 
@@ -190,6 +195,21 @@ public class RutaServiceImpl implements RutaService {
                 .replace("_", "!_");
 
         return "%" + escapado + "%";
+    }
+
+    private void validarDesactivacion(Ruta ruta, boolean nuevaActiva) {
+        boolean intentaDesactivar = Boolean.TRUE.equals(ruta.getActiva()) && !nuevaActiva;
+
+        if (intentaDesactivar
+                && rutas.contarVuelosPorEstado(
+                        ruta.getId(),
+                        EstadoVuelo.PROGRAMADO) > 0) {
+
+            throw new ConflictoException(
+                    "No se puede desactivar la ruta porque "
+                            + "tiene vuelos programados asociados")
+                    .conCodigo("RUTA_CON_VUELOS_PROGRAMADOS");
+        }
     }
 
 }
