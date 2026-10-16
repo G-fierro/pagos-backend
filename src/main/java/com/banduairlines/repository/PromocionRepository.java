@@ -9,7 +9,7 @@ import org.springframework.data.repository.query.Param;
 import com.banduairlines.model.Promocion;
 
 public interface PromocionRepository extends JpaRepository<Promocion, Long> {
-    
+
     @Query("""
             select promocion
             from Promocion promocion
