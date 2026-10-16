@@ -34,7 +34,7 @@ public class RegistroController {
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(
             summary = "Registrar un pasajero",
-            description = "Acceso publico. Crea una cuenta PASAJERO con nivel BRONCE."
+            description = "Acceso publico. Crea una cuenta PASAJERO con nivel BASICO."
     )
     @io.swagger.v3.oas.annotations.parameters.RequestBody(
             required = true,
@@ -52,7 +52,7 @@ public class RegistroController {
                     content = @Content(
                             schema = @Schema(implementation = RespuestaUsuario.class),
                             examples = @ExampleObject(value = """
-                                    {"idUsuario":1,"nombres":"Valentina","apellidos":"Rojas","correo":"valentina@example.com","rol":"PASAJERO","nivel":"BRONCE"}
+                                    {"idUsuario":1,"nombres":"Valentina","apellidos":"Rojas","correo":"valentina@example.com","rol":"PASAJERO","nivel":"BASICO"}
                                     """)
                     )
             ),

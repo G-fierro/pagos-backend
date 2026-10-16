@@ -84,7 +84,7 @@ public class CambioCorreoController {
                     content = @Content(
                             schema = @Schema(implementation = RespuestaUsuario.class),
                             examples = @ExampleObject(value = """
-                                    {"idUsuario":1,"nombres":"Valentina","apellidos":"Rojas","correo":"correo.nuevo@example.com","rol":"PASAJERO","nivel":"BRONCE"}
+                                    {"idUsuario":1,"nombres":"Valentina","apellidos":"Rojas","correo":"correo.nuevo@example.com","rol":"PASAJERO","nivel":"BASICO"}
                                     """)
                     )
             ),

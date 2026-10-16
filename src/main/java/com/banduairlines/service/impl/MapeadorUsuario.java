@@ -12,10 +12,7 @@ final class MapeadorUsuario {
 
     static RespuestaUsuario aRespuesta(Usuario usuario) {
         CuentaFidelizacion cuenta = usuario.getCuentaFidelizacion();
-        Nivel nivelPersistido = cuenta != null ? cuenta.getNivel() : null;
-        String nivelRespuesta = nivelPersistido == Nivel.BASICO
-                ? "BRONCE"
-                : nivelPersistido != null ? nivelPersistido.name() : null;
+        Nivel nivel = cuenta != null ? cuenta.getNivel() : null;
 
         return new RespuestaUsuario(
                 usuario.getId(),
@@ -23,7 +20,7 @@ final class MapeadorUsuario {
                 usuario.getApellido(),
                 usuario.getEmail(),
                 usuario.getRol(),
-                nivelRespuesta
+                nivel
         );
     }
 }

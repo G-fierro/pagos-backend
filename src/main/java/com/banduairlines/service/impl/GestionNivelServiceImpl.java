@@ -49,14 +49,14 @@ public class GestionNivelServiceImpl implements GestionNivelService {
         validarConfiguracion();
 
         return switch (nivel) {
-            case BASICO -> new ConfiguracionNivel("BRONCE", 0L, BigDecimal.ONE);
+            case BASICO -> new ConfiguracionNivel(Nivel.BASICO, 0L, BigDecimal.ONE);
             case PLATA -> new ConfiguracionNivel(
-                    "PLATA",
+                    Nivel.PLATA,
                     millasMinimasPlata,
                     new BigDecimal("1.2")
             );
             case ORO -> new ConfiguracionNivel(
-                    "ORO",
+                    Nivel.ORO,
                     millasMinimasOro,
                     new BigDecimal("1.5")
             );
