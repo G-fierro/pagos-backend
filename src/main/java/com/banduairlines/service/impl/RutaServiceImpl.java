@@ -16,6 +16,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -76,6 +77,14 @@ public class RutaServiceImpl implements RutaService {
         Ruta ruta = buscarRuta(id);
         ruta.setActiva(activa);
         return convertirRespuesta(rutas.saveAndFlush(ruta));
+    }
+
+    @Override
+    public List<RutaRespuesta> listarTodas(Boolean activa) {
+        return rutas.listarTodasAdministracion(activa)
+                .stream()
+                .map(this::convertirRespuesta)
+                .toList();
     }
 
     private void validarSolicitud(RutaSolicitud solicitud, Long excluirId) {

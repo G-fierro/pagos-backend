@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.RequestBody;
 
 import java.net.URI;
+import java.util.List;
 
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
@@ -45,6 +46,13 @@ public class RutaController {
     @GetMapping("/{id}")
     public RutaRespuesta obtener(@PathVariable @Positive Long id) {
         return servicio.obtener(id);
+    }
+
+    @GetMapping("/todas")
+    public List<RutaRespuesta> listarTodas(
+            @RequestParam(required = false) Boolean activa) {
+
+        return servicio.listarTodas(activa);
     }
 
     @PostMapping

@@ -4,6 +4,7 @@ import org.springframework.data.domain.Page;
 
 import com.banduairlines.dto.admin.RutaRespuesta;
 import com.banduairlines.dto.admin.RutaSolicitud;
+import java.util.List;
 
 
 public interface RutaService {
@@ -17,5 +18,6 @@ public interface RutaService {
     RutaRespuesta crear (RutaSolicitud solicitud);
     RutaRespuesta actualizar(Long id, RutaSolicitud solicitud);
     RutaRespuesta cambiarEstado(Long id, boolean activa);
+    List<RutaRespuesta> listarTodas(Boolean activa);
 
 }
