@@ -460,14 +460,14 @@ class PagoServiceTest {
         assertEquals(Instant.parse("2026-09-27T00:52:00Z"), item.fechaEmision());
         assertEquals(255320, item.totalCLP());
 
-        // El rango se interpreta en America/Santiago: septiembre empieza a las 03:00 UTC (UTC-3) y
-        // termina el 1 de octubre a las 02:59:59 UTC (ya rige UTC-3 tras el cambio de hora de septiembre).
+        // Las fechas se guardan y se comparan en UTC: el rango es de las 00:00 del 1 de septiembre
+        // al último instante del 30 de septiembre, ambos en UTC.
         ArgumentCaptor<LocalDateTime> desde = ArgumentCaptor.forClass(LocalDateTime.class);
         ArgumentCaptor<LocalDateTime> hasta = ArgumentCaptor.forClass(LocalDateTime.class);
         verify(pagoRepository).findPagadosByUsuarioId(eq(7L), desde.capture(), hasta.capture(), eq("K7QX2M"), any(Pageable.class));
-        assertEquals(LocalDateTime.of(2026, 9, 1, 4, 0), desde.getValue());
-        assertTrue(hasta.getValue().isAfter(LocalDateTime.of(2026, 10, 1, 2, 59)));
-        assertTrue(hasta.getValue().isBefore(LocalDateTime.of(2026, 10, 1, 3, 1)));
+        assertEquals(LocalDateTime.of(2026, 9, 1, 0, 0), desde.getValue());
+        assertTrue(hasta.getValue().isAfter(LocalDateTime.of(2026, 9, 30, 23, 59)));
+        assertTrue(hasta.getValue().isBefore(LocalDateTime.of(2026, 10, 1, 0, 0)));
     }
 
     @Test

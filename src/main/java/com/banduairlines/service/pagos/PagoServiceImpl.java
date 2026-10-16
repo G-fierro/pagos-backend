@@ -533,14 +533,14 @@ public class PagoServiceImpl implements PagoService {
         return LocalDateTime.now(ZoneOffset.UTC);
     }
 
-    /** Inicio del día en America/Santiago, expresado en UTC (como se guardan las fechas). */
+    /** Inicio del día UTC (las fechas se guardan y se comparan en UTC). */
     private static LocalDateTime inicioDiaUtc(LocalDate fecha) {
-        return fecha.atStartOfDay(ZONA_CHILE).withZoneSameInstant(ZoneOffset.UTC).toLocalDateTime();
+        return fecha.atStartOfDay();
     }
 
-    /** Último instante del día en America/Santiago, expresado en UTC. */
+    /** Último instante del día UTC. */
     private static LocalDateTime finDiaUtc(LocalDate fecha) {
-        return fecha.plusDays(1).atStartOfDay(ZONA_CHILE).withZoneSameInstant(ZoneOffset.UTC).toLocalDateTime().minusNanos(1);
+        return fecha.plusDays(1).atStartOfDay().minusNanos(1);
     }
 
     private static Long numeroBoleta(Long pagoId) {
