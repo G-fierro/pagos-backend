@@ -12,9 +12,15 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+
 import com.banduairlines.exception.ReglaNegocioException;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import java.util.List;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 
 import java.util.Optional;
 
@@ -344,5 +350,66 @@ class RutaServiceImplTest {
                                 .duracionMin(85)
                                 .activa(true)
                                 .build();
+        }
+
+        @Test
+        void buscarNormalizaElTextoYConservaLaPaginacion() {
+                Ruta ruta = crearRutaActivaParaPrueba();
+
+                var paginacion = PageRequest.of(
+                                0,
+                                10,
+                                Sort.by("id").ascending());
+
+                when(rutas.buscarAdministracion(
+                                true,
+                                "%santiago%",
+                                paginacion))
+                                .thenReturn(
+                                                new PageImpl<>(List.of(ruta), paginacion, 1));
+
+                var resultado = servicio.buscar(
+                                true,
+                                "  SANTIAGO  ",
+                                0,
+                                10);
+
+                assertThat(resultado.getContent()).hasSize(1);
+                assertThat(resultado.getContent().getFirst().id())
+                                .isEqualTo(10L);
+                assertThat(resultado.getNumber()).isZero();
+                assertThat(resultado.getSize()).isEqualTo(10);
+                assertThat(resultado.getTotalElements()).isEqualTo(1L);
+
+                verify(rutas).buscarAdministracion(
+                                true,
+                                "%santiago%",
+                                paginacion);
+                verifyNoMoreInteractions(rutas);
+        }
+
+        @Test
+        void buscarTodasConsultaSinPaginacionYEscapaCaracteresEspeciales() {
+                Ruta ruta = crearRutaActivaParaPrueba();
+
+                var sinPaginacion = Pageable.unpaged(
+                                Sort.by("id").ascending());
+
+                when(rutas.buscarAdministracion(
+                                null,
+                                "%scl!_!%!!%",
+                                sinPaginacion))
+                                .thenReturn(new PageImpl<>(List.of(ruta)));
+
+                var resultado = servicio.buscarTodas(null, "SCL_%!");
+
+                assertThat(resultado).hasSize(1);
+                assertThat(resultado.getFirst().id()).isEqualTo(10L);
+
+                verify(rutas).buscarAdministracion(
+                                null,
+                                "%scl!_!%!!%",
+                                sinPaginacion);
+                verifyNoMoreInteractions(rutas);
         }
 }
