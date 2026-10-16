@@ -13,7 +13,15 @@ public final class SecurityRoutes {
             "/actuator/health",               // INTEGRA: healthcheck del despliegue (Actuator)
             "/actuator/health/**",
             API + "/auth/**",                 // CUENTA: login y registro
-            API + "/pagos/notificaciones"     // PAGOS: callback servidor-a-servidor de Flow (no trae token)
+            API + "/pagos/notificaciones",    // PAGOS: callback servidor-a-servidor de Flow (no trae token)
+            API + "/reservas",                // RESERVA: POST inicia la compra; sin JWT es de invitado y recibe compraToken
+            API + "/reservas/*/pasajeros",    // RESERVA: endpoints 3, 4 y 6 (invitado con X-Compra-Token)
+            API + "/reservas/*/contacto",
+            API + "/reservas/*/asientos",
+            API + "/reservas/*/servicios",    // RESERVA: el invitado entra con X-Compra-Token; ReservaAcceso exige token o JWT del dueño
+            API + "/reservas/*/promocion",
+            API + "/reservas/*/pago",
+            API + "/reservas/*/cancelacion"
     };
 
     /** Públicas solo para GET. */
@@ -21,7 +29,9 @@ public final class SecurityRoutes {
             API + "/busqueda/**",             // BÚSQUEDA: el visitante busca vuelos sin cuenta (ruta propuesta)
             "/v3/api-docs/**",
             "/swagger-ui/**",
-            "/swagger-ui.html"
+            "/swagger-ui.html",
+            API + "/reservas/*",              // RESERVA: endpoint 2 (invitado con X-Compra-Token); ReservaAcceso exige token o JWT
+            API + "/reservas/*/tramos/*/asientos" // RESERVA: endpoint 5
             // PENDIENTE: rutas de invitado de RESERVA, PAGOS y CHECKIN. Cada equipo las propone por PR (D-03).
     };
 
