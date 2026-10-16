@@ -3,6 +3,7 @@ package com.banduairlines.repository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import java.util.List;
@@ -11,7 +12,7 @@ import com.banduairlines.model.Ruta;
 import com.banduairlines.model.enums.EstadoVuelo;
 
 public interface RutaRepository extends JpaRepository<Ruta, Long> {
-
+        List<Ruta> findByActivaTrue();
         @Query("""
                         select ruta
                         from Ruta ruta

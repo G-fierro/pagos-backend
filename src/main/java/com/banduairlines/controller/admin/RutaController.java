@@ -1,5 +1,10 @@
 package com.banduairlines.controller.admin;
 
+import java.net.URI;
+import java.util.List;
+
+import org.springframework.data.domain.Page;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -7,27 +12,19 @@ import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.bind.annotation.RequestBody;
-
-import java.net.URI;
-import java.util.List;
-
-import org.springframework.data.domain.Page;
-import org.springframework.http.ResponseEntity;
-
-import com.banduairlines.service.admin.RutaService;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Positive;
+import lombok.RequiredArgsConstructor;
 
-import com.banduairlines.dto.admin.RutaSolicitud;
 import com.banduairlines.dto.admin.EstadoRutaSolicitud;
 import com.banduairlines.dto.admin.RutaRespuesta;
-
-import lombok.RequiredArgsConstructor;
+import com.banduairlines.dto.admin.RutaSolicitud;
+import com.banduairlines.service.admin.RutaService;
 
 @RestController
 @RequestMapping("/api/v1/admin/rutas")
@@ -35,11 +32,12 @@ import lombok.RequiredArgsConstructor;
 @Validated
 @PreAuthorize("hasRole('ADMINISTRADOR')")
 public class RutaController {
-    private final RutaService servicio;
+
+    private final RutaService rutaService;
 
     @GetMapping("/{id}")
     public RutaRespuesta obtener(@PathVariable @Positive Long id) {
-        return servicio.obtener(id);
+        return rutaService.obtener(id);
     }
 
     @GetMapping
@@ -50,10 +48,10 @@ public class RutaController {
             @RequestParam(required = false) String buscar) {
 
         if (buscar == null || buscar.isBlank()) {
-            return servicio.listar(activa, pagina, tamano);
+            return rutaService.listar(activa, pagina, tamano);
         }
 
-        return servicio.buscar(activa, buscar, pagina, tamano);
+        return rutaService.buscar(activa, buscar, pagina, tamano);
     }
 
     @GetMapping("/todas")
@@ -62,22 +60,28 @@ public class RutaController {
             @RequestParam(required = false) String buscar) {
 
         if (buscar == null || buscar.isBlank()) {
-            return servicio.listarTodas(activa);
+            return rutaService.listarTodas(activa);
         }
 
-        return servicio.buscarTodas(activa, buscar);
+        return rutaService.buscarTodas(activa, buscar);
     }
 
     @PostMapping
-    public ResponseEntity<RutaRespuesta> crear(@Valid @RequestBody RutaSolicitud solicitud) {
-        RutaRespuesta respuesta = servicio.crear(solicitud);
+    public ResponseEntity<RutaRespuesta> crear(
+            @Valid @RequestBody RutaSolicitud solicitud) {
+
+        RutaRespuesta respuesta = rutaService.crear(solicitud);
         URI ubicacion = URI.create("/api/v1/admin/rutas/" + respuesta.id());
+
         return ResponseEntity.created(ubicacion).body(respuesta);
     }
 
     @PutMapping("/{id}")
-    public RutaRespuesta actualizar(@PathVariable @Positive Long id, @Valid @RequestBody RutaSolicitud solicitud) {
-        return servicio.actualizar(id, solicitud);
+    public RutaRespuesta actualizar(
+            @PathVariable @Positive Long id,
+            @Valid @RequestBody RutaSolicitud solicitud) {
+
+        return rutaService.actualizar(id, solicitud);
     }
 
     @PatchMapping("/{id}/estado")
@@ -85,6 +89,6 @@ public class RutaController {
             @PathVariable @Positive Long id,
             @Valid @RequestBody EstadoRutaSolicitud solicitud) {
 
-        return servicio.cambiarEstado(id, solicitud.activa());
+        return rutaService.cambiarEstado(id, solicitud.activa());
     }
 }
