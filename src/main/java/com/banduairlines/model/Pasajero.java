@@ -43,6 +43,10 @@ public class Pasajero {
     @Column(name = "numero_documento", nullable = false, length = 30)
     private String numeroDocumento; 
 
+    // Requerida por el contrato (PUT /pasajeros); nullable en la base para no romper filas existentes.
+    @Column(length = 60)
+    private String nacionalidad;
+
     @Column(name = "fecha_nacimiento", nullable = false)
     private LocalDate fechaNacimiento; 
 

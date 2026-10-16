@@ -23,15 +23,31 @@ public class Reserva {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "codigo_reserva", nullable = false, unique = true, length = 6)
+    // Se asigna al iniciar el pago (ReservaPagoServiceImpl); mientras la compra está EN_CURSO es null.
+    @Column(name = "codigo_reserva", unique = true, length = 6)
     private String codigoReserva; 
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "usuario_id")
     private Usuario usuario; 
 
-    @Column(name = "email_contacto", nullable = false, length = 150)
-    private String emailContacto; 
+    // Se registra en PUT /reservas/{id}/contacto; es obligatorio para iniciar el pago (DATOS_INCOMPLETOS),
+    // no para crear la reserva, porque en R-01 todavía no se conoce.
+    @Column(name = "email_contacto", length = 150)
+    private String emailContacto;
+
+    // Pasajeros declarados al crear la reserva (R-01); PUT /pasajeros debe coincidir con ellos.
+    @Column(name = "cantidad_adultos")
+    private Integer cantidadAdultos;
+
+    @Column(name = "cantidad_ninos")
+    private Integer cantidadNinos;
+
+    @Column(name = "cantidad_bebes")
+    private Integer cantidadBebes;
+
+    @Column(name = "nombre_contacto", length = 160)
+    private String nombreContacto;
 
     @Column(name = "telefono_contacto", length = 30)
     private String telefonoContacto; 
