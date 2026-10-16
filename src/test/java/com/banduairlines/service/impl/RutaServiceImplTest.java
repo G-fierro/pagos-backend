@@ -12,6 +12,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import com.banduairlines.exception.ReglaNegocioException;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.util.Optional;
 
@@ -230,6 +232,48 @@ class RutaServiceImplTest {
                 .isInstanceOf(ConflictoException.class);
 
         verify(rutas, never()).saveAndFlush(any(Ruta.class));
+        verifyNoInteractions(aeropuertos);
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = { true, false })
+    void cambiarEstadoConservaElRecorrido(boolean activa) {
+        Aeropuerto origen = Aeropuerto.builder()
+                .id(1L)
+                .codigoIata("SCL")
+                .ciudad("Santiago")
+                .build();
+
+        Aeropuerto destino = Aeropuerto.builder()
+                .id(2L)
+                .codigoIata("ZCO")
+                .ciudad("Temuco")
+                .build();
+
+        Ruta ruta = Ruta.builder()
+                .id(10L)
+                .origen(origen)
+                .destino(destino)
+                .distanciaKm(620)
+                .duracionMin(85)
+                .activa(!activa)
+                .build();
+
+        when(rutas.findById(10L))
+                .thenReturn(Optional.of(ruta));
+
+        when(rutas.saveAndFlush(any(Ruta.class)))
+                .thenReturn(ruta);
+
+        var respuesta = servicio.cambiarEstado(10L, activa);
+
+        assertThat(respuesta.activa()).isEqualTo(activa);
+        assertThat(respuesta.origenId()).isEqualTo(1L);
+        assertThat(respuesta.destinoId()).isEqualTo(2L);
+        assertThat(respuesta.distanciaKm()).isEqualTo(620);
+        assertThat(respuesta.duracionMin()).isEqualTo(85);
+
+        verify(rutas).saveAndFlush(ruta);
         verifyNoInteractions(aeropuertos);
     }
 }
