@@ -22,6 +22,7 @@ public interface PagoService {
                                                                   LocalDate desde, LocalDate hasta,
                                                                   String codigoReserva);
 
+    BoletaResponse obtenerBoletaPorId(Long boletaId);
 
 
     BoletaResponse obtenerBoletaPorId(Long boletaId);
