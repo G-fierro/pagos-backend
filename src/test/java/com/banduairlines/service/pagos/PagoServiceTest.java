@@ -378,7 +378,7 @@ class PagoServiceTest {
         when(reservasNotificationClient.notificarResultado(eq(1L), any(ResultadoPagoRequest.class)))
                 .thenReturn(new ReservasNotificationClient.ReservasNotificacionResult(false, 409, "ESTADO_INVALIDO", "cancelada"));
         when(flowClient.crearReembolso(eq("REF-10"), eq("pagador@test.com"), eq(255320), anyString(), eq(5555L)))
-                .thenReturn(new FlowRefundResponse("refund", 777L, "2026-09-27", "created", 255320, "REF_TOKEN_1"));
+                .thenReturn(new FlowRefundResponse("refund", 777L, "2026-09-27", "created", java.math.BigDecimal.valueOf(255320), "REF_TOKEN_1"));
 
         pagoService.procesarNotificacionFlow("TOKEN_CANC");
         // Flow vuelve a avisar: no debe reprocesar ni pedir otro reembolso.
@@ -419,7 +419,7 @@ class PagoServiceTest {
         pago.setDetalleRespuesta("{\"sinReserva\":true,\"reembolso\":{\"token\":\"REF_TOKEN_1\",\"estado\":\"created\"}}");
         when(pagoRepository.findByReembolsoToken("REF_TOKEN_1")).thenReturn(Optional.of(pago));
         when(flowClient.obtenerEstadoReembolso("REF_TOKEN_1"))
-                .thenReturn(new FlowRefundResponse("refund", 777L, "2026-09-27", "accepted", 255320, "REF_TOKEN_1"));
+                .thenReturn(new FlowRefundResponse("refund", 777L, "2026-09-27", "accepted", java.math.BigDecimal.valueOf(255320), "REF_TOKEN_1"));
 
         pagoService.procesarNotificacionReembolso("REF_TOKEN_1");
 
