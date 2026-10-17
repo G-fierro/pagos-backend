@@ -23,16 +23,11 @@ public interface PagoRepository extends JpaRepository<Pago, Long> {
 
     Optional<Pago> findFirstByReservaIdAndEstadoOrderByIdDesc(Long reservaId, EstadoPago estado);
 
-    @Query("SELECT p FROM Pago p WHERE p.reserva.usuario.id = :usuarioId AND p.estado = 'PAGADO' ORDER BY p.fechaPago DESC, p.createdAt DESC")
-    Page<Pago> findPagadosByUsuarioId(@Param("usuarioId") Long usuarioId, Pageable pageable);
+    /** Busca el pago por el token del reembolso que Pagos guarda en detalle_respuesta (PostgreSQL). */
+    @Query(value = "SELECT * FROM pagos WHERE CAST(detalle_respuesta AS jsonb) -> 'reembolso' ->> 'token' = :token LIMIT 1",
+            nativeQuery = true)
+    Optional<Pago> findByReembolsoToken(@Param("token") String token);
 
-<<<<<<< Updated upstream
-    @Query("SELECT p FROM Pago p WHERE (:desde IS NULL OR p.fechaPago >= :desde) AND (:hasta IS NULL OR p.fechaPago <= :hasta)")
-    List<Pago> findByRangoFechas(@Param("desde") LocalDateTime desde, @Param("hasta") LocalDateTime hasta);
-
-    @Query("SELECT p FROM Pago p WHERE (:desde IS NULL OR p.fechaPago >= :desde) AND (:hasta IS NULL OR p.fechaPago <= :hasta)")
-    Page<Pago> findByRangoFechasPaginado(@Param("desde") LocalDateTime desde, @Param("hasta") LocalDateTime hasta, Pageable pageable);
-=======
     /** Sin parámetros nulos: el servicio usa límites amplios y '%' cuando el filtro no viene. */
     @Query("SELECT p FROM Pago p WHERE p.reserva.usuario.id = :usuarioId AND p.estado = 'PAGADO' " +
             "AND p.fechaPago >= :desde AND p.fechaPago <= :hasta " +
@@ -49,5 +44,4 @@ public interface PagoRepository extends JpaRepository<Pago, Long> {
 
     @Query("SELECT COUNT(p) FROM Pago p WHERE p.estado = 'RECHAZADO' AND p.createdAt >= :desde AND p.createdAt <= :hasta")
     long countRechazadosEnRango(@Param("desde") LocalDateTime desde, @Param("hasta") LocalDateTime hasta);
->>>>>>> Stashed changes
 }

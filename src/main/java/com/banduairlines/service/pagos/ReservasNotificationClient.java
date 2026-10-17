@@ -2,6 +2,7 @@ package com.banduairlines.service.pagos;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
@@ -22,20 +23,14 @@ public class ReservasNotificationClient {
     private final String serviceKey;
     private final String baseUrl;
 
-<<<<<<< Updated upstream
-=======
     public static final String DEFAULT_SERVICE_KEY = "clave_compartida_reservas";
     public static final String DEFAULT_BASE_URL = "http://localhost:8080";
 
     @Autowired
->>>>>>> Stashed changes
     public ReservasNotificationClient(
             @Value("${bandu.internas.service-key:clave_compartida_reservas}") String serviceKey,
-            @Value("${bandu.reservas.url:http://localhost:8080}") String baseUrl,
-            RestClient.Builder restClientBuilder
+            @Value("${bandu.reservas.url:http://localhost:8080}") String baseUrl
     ) {
-<<<<<<< Updated upstream
-=======
         this(
             (serviceKey != null && !serviceKey.isBlank()) ? serviceKey : DEFAULT_SERVICE_KEY,
             (baseUrl != null && !baseUrl.isBlank()) ? baseUrl : DEFAULT_BASE_URL,
@@ -44,7 +39,6 @@ public class ReservasNotificationClient {
     }
 
     ReservasNotificationClient(String serviceKey, String baseUrl, RestClient.Builder restClientBuilder) {
->>>>>>> Stashed changes
         this.serviceKey = serviceKey;
         this.baseUrl = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
         this.restClient = restClientBuilder.baseUrl(this.baseUrl).build();

@@ -33,14 +33,12 @@ public class FlowClientImpl implements FlowClient {
     private final String apiUrl;
     private final RestClient restClient;
 
+    @org.springframework.beans.factory.annotation.Autowired
     public FlowClientImpl(
             @Value("${bandu.flow.api-key:}") String apiKey,
             @Value("${bandu.flow.secret-key:}") String secretKey,
-            @Value("${bandu.flow.api-url:https://sandbox.flow.cl/api}") String apiUrl,
-            RestClient.Builder restClientBuilder
+            @Value("${bandu.flow.api-url:https://sandbox.flow.cl/api}") String apiUrl
     ) {
-<<<<<<< Updated upstream
-=======
         this(
             (apiKey != null && !apiKey.isBlank()) ? apiKey : DEFAULT_API_KEY,
             (secretKey != null && !secretKey.isBlank()) ? secretKey : DEFAULT_SECRET_KEY,
@@ -50,7 +48,6 @@ public class FlowClientImpl implements FlowClient {
     }
 
     FlowClientImpl(String apiKey, String secretKey, String apiUrl, RestClient.Builder restClientBuilder) {
->>>>>>> Stashed changes
         this.apiKey = apiKey;
         this.secretKey = secretKey;
         this.apiUrl = apiUrl.endsWith("/") ? apiUrl.substring(0, apiUrl.length() - 1) : apiUrl;
