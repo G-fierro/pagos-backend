@@ -26,3 +26,7 @@ public class PagoInternoController {
         return pagoService.iniciarPago(request, serviceKey);
     }
 }
+            @Valid @RequestBody IniciarPagoRequest request) {
+        return pagoService.iniciarPago(request, serviceKey);
+    }
+}

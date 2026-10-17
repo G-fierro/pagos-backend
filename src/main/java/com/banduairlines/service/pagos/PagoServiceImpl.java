@@ -397,6 +397,68 @@ public class PagoServiceImpl implements PagoService {
 
     @Override
     @Transactional(readOnly = true)
+    public PaginaResponse<BoletaResumenResponse> obtenerHistorialBoletas(int pagina, int tamano,
+                                                                         LocalDate desde, LocalDate hasta,
+                                                                         String codigoReserva) {
+        UsuarioAutenticado usuario = usuarioActual.exigir();
+        if (usuario.rol() != RolUsuario.PASAJERO) {
+            throw new AccessDeniedException("Solo pasajeros pueden consultar su historial de boletas");
+        }
+        validarPaginacion(pagina, tamano);
+        validarRango(desde, hasta);
+
+        String codigo = codigoReserva != null && !codigoReserva.isBlank()
+                ? codigoReserva.trim().toUpperCase(Locale.ROOT)
+                : "%";
+
+        Pageable pageable = PageRequest.of(pagina, tamano);
+        Page<Pago> pagosPagados = pagoRepository.findPagadosByUsuarioId(
+                usuario.id(),
+                desde != null ? inicioDiaUtc(desde) : LocalDateTime.of(1970, 1, 1, 0, 0),
+                hasta != null ? finDiaUtc(hasta) : LocalDateTime.of(9999, 12, 31, 23, 59, 59),
+                codigo,
+                pageable);
+
+        // Todos los datos del resumen están en columnas: no hace falta leer el JSON de cada pago.
+        List<BoletaResumenResponse> resumenes = pagosPagados.getContent().stream()
+                .map(p -> new BoletaResumenResponse(
+                        p.getId(),
+                        numeroBoleta(p.getId()),
+                        p.getReserva().getCodigoReserva(),
+                        p.getFechaPago() != null ? p.getFechaPago().toInstant(ZoneOffset.UTC) : null,
+                        p.getMonto().intValue()
+                ))
+                .toList();
+
+        return new PaginaResponse<>(
+                resumenes,
+                pagosPagados.getNumber(),
+                pagosPagados.getSize(),
+                pagosPagados.getTotalElements(),
+                pagosPagados.getTotalPages()
+        );
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public BoletaResponse obtenerBoletaPorId(Long boletaId) {
+        Pago pago = pagoRepository.findById(boletaId)
+                .filter(p -> p.getEstado() == EstadoPago.PAGADO)
+                .orElseThrow(() -> new RecursoNoEncontradoException("Boleta no encontrada")
+                        .conCodigo("BOLETA_NO_ENCONTRADA"));
+
+        UsuarioAutenticado usuario = usuarioActual.exigir();
+        if (usuario.rol() != RolUsuario.ADMINISTRADOR) {
+            if (pago.getReserva().getUsuario() == null || !pago.getReserva().getUsuario().getId().equals(usuario.id())) {
+                throw new AccessDeniedException("No tienes permisos para ver esta boleta");
+            }
+        }
+
+        return leerBoletaDesdeDetalle(pago);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public BoletaPdfDto generarBoletaPdf(Long boletaId, String compraToken) {
         Pago pago = pagoRepository.findById(boletaId)
                 .filter(p -> p.getEstado() == EstadoPago.PAGADO)
@@ -406,6 +468,25 @@ public class PagoServiceImpl implements PagoService {
         reservaAcceso.obtenerAutorizada(pago.getReserva().getId(), compraToken);
         BoletaResponse boleta = leerBoletaDesdeDetalle(pago);
         return new BoletaPdfDto(boleta.numeroBoleta(), boletaPdfGenerator.generarBoletaPdf(boleta));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public BoletaResponse consultarBoletaInvitado(ConsultaBoletaInvitadoRequest request) {
+        Reserva reserva = reservaRepository.findByCodigoReservaIgnoreCase(request.codigoReserva().trim())
+                .orElseThrow(() -> new RecursoNoEncontradoException("Boleta no encontrada")
+                        .conCodigo("BOLETA_NO_ENCONTRADA"));
+
+        if (reserva.getEmailContacto() == null || !reserva.getEmailContacto().equalsIgnoreCase(request.correo().trim())) {
+            throw new RecursoNoEncontradoException("Boleta no encontrada")
+                    .conCodigo("BOLETA_NO_ENCONTRADA");
+        }
+
+        Pago pago = pagoRepository.findFirstByReservaIdAndEstadoOrderByIdDesc(reserva.getId(), EstadoPago.PAGADO)
+                .orElseThrow(() -> new RecursoNoEncontradoException("Boleta no encontrada")
+                        .conCodigo("BOLETA_NO_ENCONTRADA"));
+
+        return leerBoletaDesdeDetalle(pago);
     }
 
     @Override
@@ -433,8 +514,33 @@ public class PagoServiceImpl implements PagoService {
         return new ConstraintViolationException(mensaje, Set.of());
     }
 
+    private void validarPaginacion(int pagina, int tamano) {
+        if (pagina < 0) {
+            throw violacion("La página debe ser mayor o igual a 0");
+        }
+        if (tamano < 1 || tamano > 50) {
+            throw violacion("El tamaño de página debe estar entre 1 y 50");
+        }
+    }
+
+    private void validarRango(LocalDate desde, LocalDate hasta) {
+        if (desde != null && hasta != null && desde.isAfter(hasta)) {
+            throw violacion("La fecha 'desde' no puede ser posterior a 'hasta'");
+        }
+    }
+
     private static LocalDateTime ahoraUtc() {
         return LocalDateTime.now(ZoneOffset.UTC);
+    }
+
+    /** Inicio del día UTC (las fechas se guardan y se comparan en UTC). */
+    private static LocalDateTime inicioDiaUtc(LocalDate fecha) {
+        return fecha.atStartOfDay();
+    }
+
+    /** Último instante del día UTC. */
+    private static LocalDateTime finDiaUtc(LocalDate fecha) {
+        return fecha.plusDays(1).atStartOfDay().minusNanos(1);
     }
 
     private static Long numeroBoleta(Long pagoId) {

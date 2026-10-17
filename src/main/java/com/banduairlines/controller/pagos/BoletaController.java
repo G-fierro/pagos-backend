@@ -2,6 +2,12 @@ package com.banduairlines.controller.pagos;
 
 import com.banduairlines.dto.pagos.BoletaPdfDto;
 import com.banduairlines.dto.pagos.BoletaResponse;
+import com.banduairlines.dto.pagos.BoletaResumenResponse;
+import com.banduairlines.dto.pagos.BoletaPdfDto;
+import com.banduairlines.dto.pagos.BoletaResponse;
+import com.banduairlines.dto.pagos.BoletaResumenResponse;
+import com.banduairlines.dto.pagos.ConsultaBoletaInvitadoRequest;
+import com.banduairlines.dto.pagos.PaginaResponse;
 import com.banduairlines.service.pagos.PagoService;
 import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -43,4 +49,24 @@ public class BoletaController {
                 .body(pdf.contenido());
     }
 
+    @GetMapping("/boletas/{boletaId}")
+    public BoletaResponse obtenerBoletaPorId(@PathVariable Long boletaId) {
+        return pagoService.obtenerBoletaPorId(boletaId);
+    }
+
+    @GetMapping("/boletas/historial")
+    public PaginaResponse<BoletaResumenResponse> obtenerHistorial(
+            @RequestParam(value = "pagina", defaultValue = "0") int pagina,
+            @RequestParam(value = "tamano", defaultValue = "10") int tamano,
+            @RequestParam(value = "desde", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate desde,
+            @RequestParam(value = "hasta", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate hasta,
+            @RequestParam(value = "codigoReserva", required = false) String codigoReserva
+    ) {
+        return pagoService.obtenerHistorialBoletas(pagina, tamano, desde, hasta, codigoReserva);
+    }
+
+    @PostMapping("/boletas/consulta")
+    public BoletaResponse consultarBoletaInvitado(@Valid @RequestBody ConsultaBoletaInvitadoRequest request) {
+        return pagoService.consultarBoletaInvitado(request);
+    }
 }

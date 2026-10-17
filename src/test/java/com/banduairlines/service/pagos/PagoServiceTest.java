@@ -229,6 +229,17 @@ class PagoServiceTest {
     }
 
     @Test
+    void consultarBoletaInvitado_cuandoCodigoOCorreoNoCoinciden_lanza404() {
+        Reserva reserva = Reserva.builder().id(1L).codigoReserva("K7QX2M").emailContacto("correcto@test.com").build();
+        when(reservaRepository.findByCodigoReservaIgnoreCase("K7QX2M")).thenReturn(Optional.of(reserva));
+
+        ConsultaBoletaInvitadoRequest req = new ConsultaBoletaInvitadoRequest("K7QX2M", "incorrecto@test.com");
+        RecursoNoEncontradoException ex = assertThrows(RecursoNoEncontradoException.class, () ->
+                pagoService.consultarBoletaInvitado(req));
+        assertEquals("BOLETA_NO_ENCONTRADA", ex.getCodigo());
+    }
+
+    @Test
     void generarBoletaPdf_generaDocumentoPdfValido() {
         Reserva reserva = Reserva.builder().id(1L).codigoReserva("K7QX2M").build();
         Pago pago = Pago.builder().id(10L).reserva(reserva).estado(EstadoPago.PAGADO).monto(BigDecimal.valueOf(255320)).build();
@@ -427,6 +438,64 @@ class PagoServiceTest {
         RecursoNoEncontradoException ex = assertThrows(RecursoNoEncontradoException.class,
                 () -> pagoService.procesarNotificacionReembolso("DESCONOCIDO"));
         assertEquals("PAGO_NO_ENCONTRADO", ex.getCodigo());
+    }
+
+    @Test
+    void obtenerHistorialBoletas_armaElResumenConColumnasYAplicaFiltros() {
+        when(usuarioActual.exigir()).thenReturn(new UsuarioAutenticado(7L, "ana@test.com", RolUsuario.PASAJERO));
+        Reserva reserva = Reserva.builder().id(1L).codigoReserva("K7QX2M").build();
+        Pago pago = Pago.builder().id(10L).reserva(reserva).estado(EstadoPago.PAGADO)
+                .monto(BigDecimal.valueOf(255320)).fechaPago(LocalDateTime.of(2026, 9, 27, 0, 52)).build();
+        when(pagoRepository.findPagadosByUsuarioId(eq(7L), any(), any(), anyString(), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(pago)));
+
+        PaginaResponse<BoletaResumenResponse> pagina = pagoService.obtenerHistorialBoletas(
+                0, 10, LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 30), " k7qx2m ");
+
+        assertEquals(1, pagina.contenido().size());
+        BoletaResumenResponse item = pagina.contenido().get(0);
+        assertEquals(10L, item.boletaId());
+        assertEquals(2000010L, item.numeroBoleta());
+        assertEquals("K7QX2M", item.codigoReserva());
+        assertEquals(Instant.parse("2026-09-27T00:52:00Z"), item.fechaEmision());
+        assertEquals(255320, item.totalCLP());
+
+        // Las fechas se guardan y se comparan en UTC: el rango es de las 00:00 del 1 de septiembre
+        // al último instante del 30 de septiembre, ambos en UTC.
+        ArgumentCaptor<LocalDateTime> desde = ArgumentCaptor.forClass(LocalDateTime.class);
+        ArgumentCaptor<LocalDateTime> hasta = ArgumentCaptor.forClass(LocalDateTime.class);
+        verify(pagoRepository).findPagadosByUsuarioId(eq(7L), desde.capture(), hasta.capture(), eq("K7QX2M"), any(Pageable.class));
+        assertEquals(LocalDateTime.of(2026, 9, 1, 0, 0), desde.getValue());
+        assertTrue(hasta.getValue().isAfter(LocalDateTime.of(2026, 9, 30, 23, 59)));
+        assertTrue(hasta.getValue().isBefore(LocalDateTime.of(2026, 10, 1, 0, 0)));
+    }
+
+    @Test
+    void obtenerHistorialBoletas_sinFiltros_usaLimitesAmplios() {
+        when(usuarioActual.exigir()).thenReturn(new UsuarioAutenticado(7L, "ana@test.com", RolUsuario.PASAJERO));
+        when(pagoRepository.findPagadosByUsuarioId(eq(7L), any(), any(), anyString(), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of()));
+
+        pagoService.obtenerHistorialBoletas(0, 10, null, null, null);
+
+        ArgumentCaptor<LocalDateTime> desde = ArgumentCaptor.forClass(LocalDateTime.class);
+        ArgumentCaptor<LocalDateTime> hasta = ArgumentCaptor.forClass(LocalDateTime.class);
+        verify(pagoRepository).findPagadosByUsuarioId(eq(7L), desde.capture(), hasta.capture(), eq("%"), any(Pageable.class));
+        assertTrue(desde.getValue().isBefore(LocalDateTime.of(2000, 1, 1, 0, 0)));
+        assertTrue(hasta.getValue().isAfter(LocalDateTime.of(3000, 1, 1, 0, 0)));
+    }
+
+    @Test
+    void obtenerHistorialBoletas_validaTamanoYRol() {
+        when(usuarioActual.exigir()).thenReturn(new UsuarioAutenticado(7L, "ana@test.com", RolUsuario.PASAJERO));
+        assertThrows(ConstraintViolationException.class, () -> pagoService.obtenerHistorialBoletas(0, 51, null, null, null));
+        assertThrows(ConstraintViolationException.class, () -> pagoService.obtenerHistorialBoletas(-1, 10, null, null, null));
+        assertThrows(ConstraintViolationException.class, () -> pagoService.obtenerHistorialBoletas(
+                0, 10, LocalDate.of(2026, 10, 2), LocalDate.of(2026, 10, 1), null));
+
+        when(usuarioActual.exigir()).thenReturn(new UsuarioAutenticado(1L, "admin@test.com", RolUsuario.ADMINISTRADOR));
+        assertThrows(org.springframework.security.access.AccessDeniedException.class,
+                () -> pagoService.obtenerHistorialBoletas(0, 10, null, null, null));
     }
 
     private ReservaParaPago reservaPagada() {
