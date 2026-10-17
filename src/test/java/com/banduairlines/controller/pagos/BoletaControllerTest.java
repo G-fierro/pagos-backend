@@ -80,4 +80,87 @@ class BoletaControllerTest {
                 .andExpect(jsonPath("$.code").value("BOLETA_NO_ENCONTRADA"));
     }
 
+    @Test
+    void obtenerHistorial_retorna200ConPagina() throws Exception {
+        BoletaResumenResponse resumen = new BoletaResumenResponse(
+                1021L, 2458731L, "K7QX2M", Instant.now(), 255320
+        );
+        PaginaResponse<BoletaResumenResponse> pagina = new PaginaResponse<>(
+                List.of(resumen), 0, 10, 1L, 1
+        );
+        when(pagoService.obtenerHistorialBoletas(0, 10, null, null, null)).thenReturn(pagina);
+
+        mockMvc.perform(get("/api/v1/pagos/boletas/historial")
+                        .param("pagina", "0")
+                        .param("tamano", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.contenido[0].boletaId").value(1021L))
+                .andExpect(jsonPath("$.totalElementos").value(1));
+    }
+
+    @Test
+    void obtenerHistorial_conFiltrosDeFechaYReserva_losPasaAlServicio() throws Exception {
+        PaginaResponse<BoletaResumenResponse> vacia = new PaginaResponse<>(List.of(), 0, 10, 0L, 0);
+        when(pagoService.obtenerHistorialBoletas(0, 10, LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 30), "K7QX2M"))
+                .thenReturn(vacia);
+
+        mockMvc.perform(get("/api/v1/pagos/boletas/historial")
+                        .param("desde", "2026-09-01")
+                        .param("hasta", "2026-09-30")
+                        .param("codigoReserva", "K7QX2M"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElementos").value(0));
+    }
+
+    @Test
+    void obtenerHistorial_conTamanoInvalido_retorna400Validacion() throws Exception {
+        when(pagoService.obtenerHistorialBoletas(0, 51, null, null, null))
+                .thenThrow(new ConstraintViolationException("El tamaño de página debe estar entre 1 y 50", java.util.Set.of()));
+
+        mockMvc.perform(get("/api/v1/pagos/boletas/historial").param("tamano", "51"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDACION"));
+    }
+
+    @Test
+    void descargarBoletaPdf_retornaPdfConHeadersCorrectos() throws Exception {
+        byte[] pdfFake = "%PDF-1.4 Fake PDF bytes".getBytes();
+        when(pagoService.generarBoletaPdf(eq(1021L), any())).thenReturn(new BoletaPdfDto(2458731L, pdfFake));
+
+        mockMvc.perform(get("/api/v1/pagos/boletas/1021/pdf"))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_PDF_VALUE))
+                .andExpect(header().string(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"boleta-2458731.pdf\""))
+                .andExpect(content().bytes(pdfFake));
+    }
+
+    @Test
+    void descargarBoletaPdf_conCredencialDeCompraDeInvitado_laEntregaAlServicio() throws Exception {
+        byte[] pdfFake = "%PDF-1.4 Fake".getBytes();
+        when(pagoService.generarBoletaPdf(1021L, "TOKEN-INVITADO")).thenReturn(new BoletaPdfDto(2458731L, pdfFake));
+
+        mockMvc.perform(get("/api/v1/pagos/boletas/1021/pdf").header("X-Compra-Token", "TOKEN-INVITADO"))
+                .andExpect(status().isOk())
+                .andExpect(content().bytes(pdfFake));
+    }
+
+    @Test
+    void consultarBoletaInvitado_cuandoDatosCoinciden_retorna200() throws Exception {
+        when(pagoService.consultarBoletaInvitado(any(ConsultaBoletaInvitadoRequest.class)))
+                .thenReturn(boletaEjemplo);
+
+        String json = """
+                {
+                    "codigoReserva": "K7QX2M",
+                    "correo": "javiera@test.com"
+                }
+                """;
+
+        mockMvc.perform(post("/api/v1/pagos/boletas/consulta")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.numeroBoleta").value(2458731L))
+                .andExpect(jsonPath("$.codigoReserva").value("K7QX2M"));
+    }
 }
