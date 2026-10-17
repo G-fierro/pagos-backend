@@ -22,15 +22,7 @@ public class BoletaPdfGenerator {
             textStream.append("BT\n");
             textStream.append("/F1 16 Tf\n");
             textStream.append("50 750 Td\n");
-            textStream.append("(").append(escapePdf(boleta.emisor().razonSocial())).append(") Tj\n");
-
-            textStream.append("/F1 10 Tf\n");
-            textStream.append("0 -15 Td\n");
-            textStream.append("(RUT: ").append(escapePdf(boleta.emisor().rut())).append(" - Giro: ").append(escapePdf(boleta.emisor().giro())).append(") Tj\n");
-            textStream.append("0 -13 Td\n");
-            textStream.append("(Direccion: ").append(escapePdf(boleta.emisor().direccion())).append(") Tj\n");
-            textStream.append("0 -13 Td\n");
-            textStream.append("(Telefono: ").append(escapePdf(boleta.emisor().telefono())).append(") Tj\n");
+            textStream.append("(BANDUAIRLINES) Tj\n");
 
             textStream.append("/F1 14 Tf\n");
             textStream.append("0 -25 Td\n");
@@ -45,11 +37,7 @@ public class BoletaPdfGenerator {
             textStream.append("0 -18 Td\n");
             textStream.append("(RECEPTOR / CLIENTE) Tj\n");
             textStream.append("0 -13 Td\n");
-            textStream.append("(Senor(a): ").append(escapePdf(boleta.receptor() != null ? boleta.receptor().nombreCompleto() : "Pasajero")).append(") Tj\n");
-            if (boleta.receptor() != null && boleta.receptor().rut() != null && !boleta.receptor().rut().isBlank()) {
-                textStream.append("0 -13 Td\n");
-                textStream.append("(RUT: ").append(escapePdf(boleta.receptor().rut())).append(") Tj\n");
-            }
+            textStream.append("(Senor(a): ").append(escapePdf(boleta.receptor() != null ? boleta.receptor() : "Pasajero")).append(") Tj\n");
 
             textStream.append("0 -18 Td\n");
             textStream.append("(PASAJEROS:) Tj\n");
@@ -61,7 +49,7 @@ public class BoletaPdfGenerator {
             }
 
             textStream.append("0 -20 Td\n");
-            textStream.append("-------------------------------------------------------------------------------- Tj\n");
+            textStream.append("(--------------------------------------------------------------------------------) Tj\n");
             textStream.append("0 -15 Td\n");
             textStream.append("(DETALLE DE COMPRA (Precios con IVA incluido)) Tj\n");
             textStream.append("0 -15 Td\n");
@@ -79,7 +67,7 @@ public class BoletaPdfGenerator {
                 textStream.append("0 -14 Td\n");
             }
 
-            textStream.append("-------------------------------------------------------------------------------- Tj\n");
+            textStream.append("(--------------------------------------------------------------------------------) Tj\n");
             textStream.append("/F1 12 Tf\n");
             textStream.append("0 -16 Td\n");
             textStream.append("(TOTAL PAGADO: $").append(boleta.totalCLP()).append(" CLP) Tj\n");

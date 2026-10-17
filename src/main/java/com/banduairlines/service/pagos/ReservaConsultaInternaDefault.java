@@ -8,12 +8,12 @@ import com.banduairlines.exception.RecursoNoEncontradoException;
 import com.banduairlines.model.Pasajero;
 import com.banduairlines.model.Reserva;
 import com.banduairlines.model.Usuario;
+import com.banduairlines.model.enums.TipoPasajero;
 import com.banduairlines.repository.PasajeroRepository;
 import com.banduairlines.repository.ReservaRepository;
 
 import java.time.Instant;
 import java.time.ZoneOffset;
-import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -33,39 +33,40 @@ public class ReservaConsultaInternaDefault implements ReservaConsultaInterna {
         Reserva reserva = reservaRepository.findById(reservaId)
                 .orElseThrow(() -> new RecursoNoEncontradoException("Reserva", reservaId));
 
-        String nombreCompleto = "Cliente";
-        String rut = null;
+        List<Pasajero> pasajerosEntities = pasajeroRepository.findByReservaIdOrderByIdAsc(reservaId);
+        Pasajero primerAdulto = pasajerosEntities.stream()
+                .filter(p -> p.getTipo() == TipoPasajero.ADULTO)
+                .findFirst()
+                .orElse(null);
+
+        String nombreCompleto = null;
         if (reserva.getUsuario() != null) {
             Usuario u = reserva.getUsuario();
-            nombreCompleto = (u.getNombre() != null ? u.getNombre() : "") + " " + (u.getApellido() != null ? u.getApellido() : "");
-            nombreCompleto = nombreCompleto.trim().isEmpty() ? u.getEmail() : nombreCompleto.trim();
+            nombreCompleto = ((u.getNombre() != null ? u.getNombre() : "") + " "
+                    + (u.getApellido() != null ? u.getApellido() : "")).trim();
+        }
+        if ((nombreCompleto == null || nombreCompleto.isEmpty()) && primerAdulto != null) {
+            nombreCompleto = (primerAdulto.getNombre() + " " + primerAdulto.getApellido()).trim();
+        }
+        if (nombreCompleto == null || nombreCompleto.isEmpty()) {
+            nombreCompleto = reserva.getEmailContacto();
         }
 
         ContactoDto contacto = new ContactoDto(
                 nombreCompleto,
-                reserva.getEmailContacto() != null ? reserva.getEmailContacto() : "cliente@banduairlines.com",
-                reserva.getTelefonoContacto() != null ? reserva.getTelefonoContacto() : "+56912345678"
+                reserva.getEmailContacto(),
+                reserva.getTelefonoContacto()
         );
 
-        List<Pasajero> pasajerosEntities = pasajeroRepository.findAll().stream()
-                .filter(p -> p.getReserva() != null && p.getReserva().getId().equals(reservaId))
+        List<PasajeroCompraDto> pasajeros = pasajerosEntities.stream()
+                .map(p -> new PasajeroCompraDto(p.getId(), p.getNombre(), p.getApellido()))
                 .toList();
-
-        List<PasajeroCompraDto> pasajeros = new ArrayList<>();
-        if (!pasajerosEntities.isEmpty()) {
-            for (Pasajero p : pasajerosEntities) {
-                pasajeros.add(new PasajeroCompraDto(p.getId(), p.getNombre(), p.getApellido()));
-            }
-        } else {
-            pasajeros.add(new PasajeroCompraDto(1L, contacto.nombreCompleto(), ""));
-        }
 
         int totalCLP = reserva.getTotal() != null ? reserva.getTotal().intValue() : 0;
         int descuentoCLP = reserva.getDescuento() != null ? reserva.getDescuento().intValue() : 0;
+        int subtotalCLP = reserva.getSubtotal() != null ? reserva.getSubtotal().intValue() : totalCLP + descuentoCLP;
 
-        List<LineaCompraDto> lineas = List.of(
-                new LineaCompraDto("TARIFA", "Tarifa de vuelo", totalCLP + descuentoCLP)
-        );
+        List<LineaCompraDto> lineas = List.of(new LineaCompraDto("TARIFA", "Tarifa de vuelo", subtotalCLP));
 
         TotalReservaDto total = new TotalReservaDto(lineas, descuentoCLP, totalCLP);
 
