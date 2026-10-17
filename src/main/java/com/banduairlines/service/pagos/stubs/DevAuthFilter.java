@@ -76,8 +76,8 @@ public class DevAuthFilter extends OncePerRequestFilter {
                             null,
                             List.of(new SimpleGrantedAuthority("ROLE_" + usuario.rol().name()))
                     );
-                    SecurityContextHolder.getContext().setAuthentication(auth);
-                    log.debug("Sesión autenticada en pagos (dev): id={}, email={}, rol={}",
+                    aplicarAutenticacion(request, response, auth);
+                    log.info("Sesión autenticada en pagos (dev): id={}, email={}, rol={}",
                             usuario.id(), usuario.email(), usuario.rol());
                 }
             } else if (SecurityContextHolder.getContext().getAuthentication() == null) {
@@ -88,7 +88,7 @@ public class DevAuthFilter extends OncePerRequestFilter {
                             null,
                             List.of(new SimpleGrantedAuthority("ROLE_ADMINISTRADOR"), new SimpleGrantedAuthority("ROLE_DEV"))
                     );
-                    SecurityContextHolder.getContext().setAuthentication(auth);
+                    aplicarAutenticacion(request, response, auth);
                 } else {
                     // Si la petición viene con X-Service-Key válida para endpoints internos
                     String keyHeader = request.getHeader("X-Service-Key");
@@ -98,7 +98,7 @@ public class DevAuthFilter extends OncePerRequestFilter {
                                 null,
                                 List.of(new SimpleGrantedAuthority("ROLE_ADMINISTRADOR"), new SimpleGrantedAuthority("ROLE_INTERNO"))
                         );
-                        SecurityContextHolder.getContext().setAuthentication(auth);
+                        aplicarAutenticacion(request, response, auth);
                     }
                 }
             }
@@ -107,5 +107,15 @@ public class DevAuthFilter extends OncePerRequestFilter {
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    private final org.springframework.security.web.context.SecurityContextRepository securityContextRepository =
+            new org.springframework.security.web.context.RequestAttributeSecurityContextRepository();
+
+    private void aplicarAutenticacion(HttpServletRequest request, HttpServletResponse response, org.springframework.security.core.Authentication auth) {
+        var context = SecurityContextHolder.createEmptyContext();
+        context.setAuthentication(auth);
+        SecurityContextHolder.setContext(context);
+        securityContextRepository.saveContext(context, request, response);
     }
 }

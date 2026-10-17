@@ -68,9 +68,9 @@ public class ReservasNotificationClient {
             throw new ServicioExternoException("Reservas falló al recibir la confirmación de pago", e)
                     .conCodigo("SERVICIO_EXTERNO");
         } catch (Exception e) {
-            log.warn("No fue posible conectar con Reservas (módulo no desplegado o caído): {}", e.getMessage());
-            // Si el backend es monolito y reservas aún no implementa el endpoint, permitimos simulación en dev
-            return new ReservasNotificacionResult(true, 200, null, "Simulación exitosa en desarrollo");
+            log.error("No fue posible conectar con Reservas: {}", e.getMessage());
+            throw new ServicioExternoException("No fue posible comunicarse con Reservas", e)
+                    .conCodigo("SERVICIO_EXTERNO");
         }
     }
 
