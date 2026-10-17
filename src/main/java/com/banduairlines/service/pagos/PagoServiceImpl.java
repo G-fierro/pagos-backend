@@ -23,10 +23,12 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import java.util.stream.Collectors;
 
 import java.math.BigDecimal;
 import java.time.*;
@@ -49,6 +51,12 @@ public class PagoServiceImpl implements PagoService {
     private final UsuarioActual usuarioActual;
     private final ObjectMapper objectMapper;
 
+    public static final String DEFAULT_SERVICE_KEY = "clave_compartida_reservas";
+    public static final String DEFAULT_CONFIRMACION_URL = "http://localhost:8080/api/v1/pagos/notificaciones";
+    public static final String DEFAULT_RETORNO_URL = "http://localhost:8080/api/v1/pagos/retorno";
+    public static final String DEFAULT_REEMBOLSO_URL = "http://localhost:8080/api/v1/pagos/reembolsos/notificaciones";
+    public static final String DEFAULT_FLOW_API_URL = "https://sandbox.flow.cl/api";
+
     @Value("${bandu.internas.service-key:clave_compartida_reservas}")
     private String configuredServiceKey;
 
@@ -66,6 +74,26 @@ public class PagoServiceImpl implements PagoService {
 
     @Value("${bandu.flow.api-url:https://sandbox.flow.cl/api}")
     private String flowApiUrl;
+
+    public String getFlowUrlConfirmacion() {
+        return (flowUrlConfirmacion != null && !flowUrlConfirmacion.isBlank()) ? flowUrlConfirmacion : DEFAULT_CONFIRMACION_URL;
+    }
+
+    public String getFlowUrlRetorno() {
+        return (flowUrlRetorno != null && !flowUrlRetorno.isBlank()) ? flowUrlRetorno : DEFAULT_RETORNO_URL;
+    }
+
+    public String getFlowUrlReembolsoCallback() {
+        return (flowUrlReembolsoCallback != null && !flowUrlReembolsoCallback.isBlank()) ? flowUrlReembolsoCallback : DEFAULT_REEMBOLSO_URL;
+    }
+
+    public String getConfiguredServiceKey() {
+        return (configuredServiceKey != null && !configuredServiceKey.isBlank()) ? configuredServiceKey : DEFAULT_SERVICE_KEY;
+    }
+
+    public String getFlowApiUrl() {
+        return (flowApiUrl != null && !flowApiUrl.isBlank()) ? flowApiUrl : DEFAULT_FLOW_API_URL;
+    }
 
     public PagoServiceImpl(
             PagoRepository pagoRepository,
@@ -158,8 +186,8 @@ public class PagoServiceImpl implements PagoService {
                 "Ticket de avión",
                 totalCLP,
                 reservaInfo.contacto().correo(),
-                flowUrlConfirmacion,
-                flowUrlRetorno,
+                getFlowUrlConfirmacion(),
+                getFlowUrlRetorno(),
                 timeoutSeconds
         );
 
@@ -544,16 +572,86 @@ public class PagoServiceImpl implements PagoService {
         return expiraEn == null || expiraEn.isAfter(LocalDateTime.now());
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public ResumenPagosResponse obtenerResumenAdmin(LocalDate desde, LocalDate hasta) {
+        LocalDate fechaDesde = desde != null ? desde : LocalDate.now(ZONA_CHILE).withDayOfMonth(1);
+        LocalDate fechaHasta = hasta != null ? hasta : LocalDate.now(ZONA_CHILE);
+        validarRango(fechaDesde, fechaHasta);
+
+        ZonedDateTime startZdt = fechaDesde.atStartOfDay(ZONA_CHILE);
+        ZonedDateTime endZdt = fechaHasta.atTime(LocalTime.MAX).atZone(ZONA_CHILE);
+        LocalDateTime startUtc = LocalDateTime.ofInstant(startZdt.toInstant(), ZoneOffset.UTC);
+        LocalDateTime endUtc = LocalDateTime.ofInstant(endZdt.toInstant(), ZoneOffset.UTC);
+
+        List<Pago> pagados = pagoRepository.findPagadosEnRango(startUtc, endUtc);
+        int cantidadPagos = pagados.size();
+        int montoTotalCLP = pagados.stream().mapToInt(p -> p.getMonto() != null ? p.getMonto().intValue() : 0).sum();
+        int ticketPromedioCLP = cantidadPagos > 0 ? (int) Math.round((double) montoTotalCLP / cantidadPagos) : 0;
+        long rechazados = pagoRepository.countRechazadosEnRango(startUtc, endUtc);
+
+        Map<String, List<Pago>> porMedio = pagados.stream()
+                .collect(Collectors.groupingBy(p -> p.getMedioPago() != null ? p.getMedioPago() : "Otro"));
+
+        List<TotalMedioPagoResponse> mediosList = porMedio.entrySet().stream()
+                .map(entry -> {
+                    int cant = entry.getValue().size();
+                    int sum = entry.getValue().stream().mapToInt(p -> p.getMonto() != null ? p.getMonto().intValue() : 0).sum();
+                    return new TotalMedioPagoResponse(entry.getKey(), cant, sum);
+                })
+                .sorted(Comparator.comparing(TotalMedioPagoResponse::cantidadPagos).reversed())
+                .toList();
+
+        return new ResumenPagosResponse(
+                fechaDesde,
+                fechaHasta,
+                cantidadPagos,
+                montoTotalCLP,
+                ticketPromedioCLP,
+                (int) rechazados,
+                mediosList
+        );
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PaginaResponse<PagoRegistroResponse> listarPagosAdmin(int pagina, int tamano) {
+        validarPaginacion(pagina, tamano);
+        Pageable pageable = PageRequest.of(pagina, tamano, Sort.by(Sort.Direction.DESC, "id"));
+        Page<Pago> pagosPage = pagoRepository.findAll(pageable);
+
+        List<PagoRegistroResponse> contenido = pagosPage.getContent().stream()
+                .map(p -> new PagoRegistroResponse(
+                        p.getId(),
+                        p.getReserva() != null ? p.getReserva().getId() : null,
+                        p.getReserva() != null ? p.getReserva().getCodigoReserva() : null,
+                        p.getEstado(),
+                        p.getMonto() != null ? p.getMonto().intValue() : 0,
+                        p.getMedioPago(),
+                        p.getFechaPago() != null ? p.getFechaPago().toInstant(ZoneOffset.UTC) : null,
+                        p.getCreatedAt() != null ? p.getCreatedAt().toInstant(ZoneOffset.UTC) : null
+                ))
+                .toList();
+
+        return new PaginaResponse<>(
+                contenido,
+                pagosPage.getNumber(),
+                pagosPage.getSize(),
+                pagosPage.getTotalElements(),
+                pagosPage.getTotalPages()
+        );
+    }
+
     // ---------- Métodos Auxiliares ----------
 
     private void validarServiceKey(String serviceKey) {
-        if (serviceKey == null || serviceKey.isBlank() || !serviceKey.equals(configuredServiceKey)) {
+        if (serviceKey == null || serviceKey.isBlank() || !serviceKey.equals(getConfiguredServiceKey())) {
             throw new AuthenticationCredentialsNotFoundException("Clave compartida X-Service-Key inválida o ausente");
         }
     }
 
     private String armarUrlPago(String token) {
-        String base = flowApiUrl.replace("/api", "/app/web/pay.php");
+        String base = getFlowApiUrl().replace("/api", "/app/web/pay.php");
         return base + "?token=" + token;
     }
 
@@ -575,7 +673,7 @@ public class PagoServiceImpl implements PagoService {
                     "REF-" + pago.getId(),
                     receiverEmail,
                     monto,
-                    flowUrlReembolsoCallback,
+                    getFlowUrlReembolsoCallback(),
                     pago.getFlowOrder()
             );
         } catch (Exception e) {

@@ -31,4 +31,8 @@ public interface PagoService {
     PaginaResponse<PagoRegistroResponse> obtenerPagosReportes(LocalDate desde, LocalDate hasta, int pagina, int tamano);
 
     boolean tienePagoEnEspera(Long reservaId);
+
+    ResumenPagosResponse obtenerResumenAdmin(LocalDate desde, LocalDate hasta);
+
+    PaginaResponse<PagoRegistroResponse> listarPagosAdmin(int pagina, int tamano);
 }

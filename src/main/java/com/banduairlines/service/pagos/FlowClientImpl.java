@@ -24,6 +24,10 @@ public class FlowClientImpl implements FlowClient {
 
     private static final Logger log = LoggerFactory.getLogger(FlowClientImpl.class);
 
+    public static final String DEFAULT_API_KEY = "2CFCEE34-2575-4EC9-ACA2-65A72DLDDF2D";
+    public static final String DEFAULT_SECRET_KEY = "5c001b7af4386a9c6b927fe37f7996b818625148";
+    public static final String DEFAULT_API_URL = "https://sandbox.flow.cl/api";
+
     private final String apiKey;
     private final String secretKey;
     private final String apiUrl;
@@ -35,6 +39,18 @@ public class FlowClientImpl implements FlowClient {
             @Value("${bandu.flow.api-url:https://sandbox.flow.cl/api}") String apiUrl,
             RestClient.Builder restClientBuilder
     ) {
+<<<<<<< Updated upstream
+=======
+        this(
+            (apiKey != null && !apiKey.isBlank()) ? apiKey : DEFAULT_API_KEY,
+            (secretKey != null && !secretKey.isBlank()) ? secretKey : DEFAULT_SECRET_KEY,
+            (apiUrl != null && !apiUrl.isBlank()) ? apiUrl : DEFAULT_API_URL,
+            RestClient.builder()
+        );
+    }
+
+    FlowClientImpl(String apiKey, String secretKey, String apiUrl, RestClient.Builder restClientBuilder) {
+>>>>>>> Stashed changes
         this.apiKey = apiKey;
         this.secretKey = secretKey;
         this.apiUrl = apiUrl.endsWith("/") ? apiUrl.substring(0, apiUrl.length() - 1) : apiUrl;
