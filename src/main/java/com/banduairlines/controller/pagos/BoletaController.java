@@ -29,4 +29,9 @@ public class BoletaController {
         return pagoService.obtenerBoletaPorReserva(reservaId, compraToken);
     }
 
+    @GetMapping("/boletas/{boletaId}")
+    public BoletaResponse obtenerBoletaPorId(@PathVariable Long boletaId) {
+        return pagoService.obtenerBoletaPorId(boletaId);
+    }
+
 }

@@ -19,6 +19,7 @@ public interface PagoService {
     BoletaResponse obtenerBoletaPorReserva(Long reservaId, String compraToken);
 
 
+    BoletaResponse obtenerBoletaPorId(Long boletaId);
 
 
 

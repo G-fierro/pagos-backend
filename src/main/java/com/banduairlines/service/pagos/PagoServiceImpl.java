@@ -394,6 +394,24 @@ public class PagoServiceImpl implements PagoService {
 
     @Override
     @Transactional(readOnly = true)
+    public BoletaResponse obtenerBoletaPorId(Long boletaId) {
+        Pago pago = pagoRepository.findById(boletaId)
+                .filter(p -> p.getEstado() == EstadoPago.PAGADO)
+                .orElseThrow(() -> new RecursoNoEncontradoException("Boleta no encontrada")
+                        .conCodigo("BOLETA_NO_ENCONTRADA"));
+
+        UsuarioAutenticado usuario = usuarioActual.exigir();
+        if (usuario.rol() != RolUsuario.ADMINISTRADOR) {
+            if (pago.getReserva().getUsuario() == null || !pago.getReserva().getUsuario().getId().equals(usuario.id())) {
+                throw new AccessDeniedException("No tienes permisos para ver esta boleta");
+            }
+        }
+
+        return leerBoletaDesdeDetalle(pago);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public boolean tienePagoEnEspera(Long reservaId) {
         List<Pago> pagos = pagoRepository.findByReservaIdOrderByCreatedAtDesc(reservaId);
         if (pagos.isEmpty()) return false;
