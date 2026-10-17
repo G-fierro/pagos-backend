@@ -24,6 +24,11 @@ public interface PagoService {
 
 
 
+    BoletaResponse obtenerBoletaPorId(Long boletaId);
+
+    BoletaPdfDto generarBoletaPdf(Long boletaId, String compraToken);
+
+    BoletaResponse consultarBoletaInvitado(ConsultaBoletaInvitadoRequest request);
 
     boolean tienePagoEnEspera(Long reservaId);
 }

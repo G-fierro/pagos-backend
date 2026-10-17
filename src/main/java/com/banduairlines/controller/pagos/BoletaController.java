@@ -2,6 +2,10 @@ package com.banduairlines.controller.pagos;
 
 import com.banduairlines.dto.pagos.BoletaResponse;
 import com.banduairlines.dto.pagos.BoletaResumenResponse;
+import com.banduairlines.dto.pagos.BoletaPdfDto;
+import com.banduairlines.dto.pagos.BoletaResponse;
+import com.banduairlines.dto.pagos.BoletaResumenResponse;
+import com.banduairlines.dto.pagos.ConsultaBoletaInvitadoRequest;
 import com.banduairlines.dto.pagos.PaginaResponse;
 import com.banduairlines.service.pagos.PagoService;
 import jakarta.validation.Valid;
@@ -42,4 +46,8 @@ public class BoletaController {
         return pagoService.obtenerHistorialBoletas(pagina, tamano, desde, hasta, codigoReserva);
     }
 
+    @PostMapping("/boletas/consulta")
+    public BoletaResponse consultarBoletaInvitado(@Valid @RequestBody ConsultaBoletaInvitadoRequest request) {
+        return pagoService.consultarBoletaInvitado(request);
+    }
 }
