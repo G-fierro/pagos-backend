@@ -20,6 +20,7 @@ public interface PagoService {
 
 
 
+    BoletaPdfDto generarBoletaPdf(Long boletaId, String compraToken);
 
 
     boolean tienePagoEnEspera(Long reservaId);

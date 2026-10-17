@@ -1,5 +1,6 @@
 package com.banduairlines.controller.pagos;
 
+import com.banduairlines.dto.pagos.BoletaPdfDto;
 import com.banduairlines.dto.pagos.BoletaResponse;
 import com.banduairlines.service.pagos.PagoService;
 import jakarta.validation.Valid;
@@ -27,6 +28,19 @@ public class BoletaController {
             @RequestHeader(value = "X-Compra-Token", required = false) String compraToken
     ) {
         return pagoService.obtenerBoletaPorReserva(reservaId, compraToken);
+    }
+
+    @GetMapping("/boletas/{boletaId}/pdf")
+    public ResponseEntity<byte[]> descargarBoletaPdf(
+            @PathVariable Long boletaId,
+            @RequestHeader(value = "X-Compra-Token", required = false) String compraToken
+    ) {
+        BoletaPdfDto pdf = pagoService.generarBoletaPdf(boletaId, compraToken);
+
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_PDF)
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"boleta-" + pdf.numeroBoleta() + ".pdf\"")
+                .body(pdf.contenido());
     }
 
 }

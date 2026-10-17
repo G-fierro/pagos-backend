@@ -47,6 +47,7 @@ public class PagoServiceImpl implements PagoService {
     private final ReservaAcceso reservaAcceso;
     private final FlowClient flowClient;
     private final ReservasNotificationClient reservasNotificationClient;
+    private final BoletaPdfGenerator boletaPdfGenerator;
     private final UsuarioActual usuarioActual;
     private final ObjectMapper objectMapper;
 
@@ -75,6 +76,7 @@ public class PagoServiceImpl implements PagoService {
             ReservaAcceso reservaAcceso,
             FlowClient flowClient,
             ReservasNotificationClient reservasNotificationClient,
+            BoletaPdfGenerator boletaPdfGenerator,
             UsuarioActual usuarioActual
     ) {
         this.pagoRepository = pagoRepository;
@@ -83,6 +85,7 @@ public class PagoServiceImpl implements PagoService {
         this.reservaAcceso = reservaAcceso;
         this.flowClient = flowClient;
         this.reservasNotificationClient = reservasNotificationClient;
+        this.boletaPdfGenerator = boletaPdfGenerator;
         this.usuarioActual = usuarioActual;
         // Mapper propio de Jackson 2: Spring Boot 4 solo expone un ObjectMapper de Jackson 3 como bean.
         this.objectMapper = new ObjectMapper().findAndRegisterModules();
@@ -390,6 +393,19 @@ public class PagoServiceImpl implements PagoService {
                         .conCodigo("BOLETA_NO_ENCONTRADA"));
 
         return leerBoletaDesdeDetalle(pago);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public BoletaPdfDto generarBoletaPdf(Long boletaId, String compraToken) {
+        Pago pago = pagoRepository.findById(boletaId)
+                .filter(p -> p.getEstado() == EstadoPago.PAGADO)
+                .orElseThrow(() -> new RecursoNoEncontradoException("Boleta no encontrada")
+                        .conCodigo("BOLETA_NO_ENCONTRADA"));
+
+        reservaAcceso.obtenerAutorizada(pago.getReserva().getId(), compraToken);
+        BoletaResponse boleta = leerBoletaDesdeDetalle(pago);
+        return new BoletaPdfDto(boleta.numeroBoleta(), boletaPdfGenerator.generarBoletaPdf(boleta));
     }
 
     @Override

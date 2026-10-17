@@ -80,4 +80,26 @@ class BoletaControllerTest {
                 .andExpect(jsonPath("$.code").value("BOLETA_NO_ENCONTRADA"));
     }
 
+    @Test
+    void descargarBoletaPdf_retornaPdfConHeadersCorrectos() throws Exception {
+        byte[] pdfFake = "%PDF-1.4 Fake PDF bytes".getBytes();
+        when(pagoService.generarBoletaPdf(eq(1021L), any())).thenReturn(new BoletaPdfDto(2458731L, pdfFake));
+
+        mockMvc.perform(get("/api/v1/pagos/boletas/1021/pdf"))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_PDF_VALUE))
+                .andExpect(header().string(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"boleta-2458731.pdf\""))
+                .andExpect(content().bytes(pdfFake));
+    }
+
+    @Test
+    void descargarBoletaPdf_conCredencialDeCompraDeInvitado_laEntregaAlServicio() throws Exception {
+        byte[] pdfFake = "%PDF-1.4 Fake".getBytes();
+        when(pagoService.generarBoletaPdf(1021L, "TOKEN-INVITADO")).thenReturn(new BoletaPdfDto(2458731L, pdfFake));
+
+        mockMvc.perform(get("/api/v1/pagos/boletas/1021/pdf").header("X-Compra-Token", "TOKEN-INVITADO"))
+                .andExpect(status().isOk())
+                .andExpect(content().bytes(pdfFake));
+    }
+
 }

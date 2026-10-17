@@ -57,6 +57,7 @@ class PagoServiceTest {
     @Mock
     private UsuarioActual usuarioActual;
 
+    private BoletaPdfGenerator boletaPdfGenerator;
     private ObjectMapper objectMapper;
     private PagoServiceImpl pagoService;
 
@@ -65,6 +66,7 @@ class PagoServiceTest {
     @BeforeEach
     void setUp() {
         objectMapper = new ObjectMapper().findAndRegisterModules();
+        boletaPdfGenerator = new BoletaPdfGenerator();
         pagoService = new PagoServiceImpl(
                 pagoRepository,
                 reservaRepository,
@@ -72,6 +74,7 @@ class PagoServiceTest {
                 reservaAcceso,
                 flowClient,
                 reservasNotificationClient,
+                boletaPdfGenerator,
                 usuarioActual
         );
         ReflectionTestUtils.setField(pagoService, "configuredServiceKey", serviceKey);
@@ -223,6 +226,42 @@ class PagoServiceTest {
 
         assertEquals(EstadoPago.PENDIENTE, pago.getEstado());
         verify(flowClient).crearReembolso(eq("REF-10"), eq("cliente@test.com"), eq(200000), anyString(), any());
+    }
+
+    @Test
+    void generarBoletaPdf_generaDocumentoPdfValido() {
+        Reserva reserva = Reserva.builder().id(1L).codigoReserva("K7QX2M").build();
+        Pago pago = Pago.builder().id(10L).reserva(reserva).estado(EstadoPago.PAGADO).monto(BigDecimal.valueOf(255320)).build();
+        pago.setDetalleRespuesta(detalleConBoleta(10L, 255320));
+
+        when(pagoRepository.findById(10L)).thenReturn(Optional.of(pago));
+        when(reservaAcceso.obtenerAutorizada(eq(1L), any())).thenReturn(reserva);
+
+        BoletaPdfDto pdf = pagoService.generarBoletaPdf(10L, "TOKEN-INVITADO");
+
+        assertEquals(2000010L, pdf.numeroBoleta());
+        assertNotNull(pdf.contenido());
+        assertTrue(pdf.contenido().length > 100);
+        String header = new String(pdf.contenido(), 0, 8);
+        assertTrue(header.startsWith("%PDF-1.4"), "El PDF debe iniciar con la cabecera estándar %PDF-1.4");
+        String texto = new String(pdf.contenido(), java.nio.charset.StandardCharsets.ISO_8859_1);
+        assertTrue(texto.contains("Javiera Mu"), "El PDF muestra el receptor");
+        assertFalse(texto.contains("RUT"), "La boleta no lleva RUT del emisor ni del receptor");
+        verify(reservaAcceso).obtenerAutorizada(1L, "TOKEN-INVITADO");
+        verifyNoInteractions(usuarioActual);
+    }
+
+    @Test
+    void generarBoletaPdf_sinBoletaGuardada_lanza404SinReconstruir() {
+        Reserva reserva = Reserva.builder().id(1L).codigoReserva("K7QX2M").build();
+        Pago pago = Pago.builder().id(10L).reserva(reserva).estado(EstadoPago.PAGADO).monto(BigDecimal.valueOf(255320)).build();
+        when(pagoRepository.findById(10L)).thenReturn(Optional.of(pago));
+        when(reservaAcceso.obtenerAutorizada(eq(1L), any())).thenReturn(reserva);
+
+        RecursoNoEncontradoException ex = assertThrows(RecursoNoEncontradoException.class,
+                () -> pagoService.generarBoletaPdf(10L, null));
+        assertEquals("BOLETA_NO_ENCONTRADA", ex.getCodigo());
+        verifyNoInteractions(reservaConsultaInterna);
     }
 
     @Test
