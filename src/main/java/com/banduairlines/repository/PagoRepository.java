@@ -23,6 +23,12 @@ public interface PagoRepository extends JpaRepository<Pago, Long> {
 
     Optional<Pago> findFirstByReservaIdAndEstadoOrderByIdDesc(Long reservaId, EstadoPago estado);
 
+    /** Busca el pago por el token del reembolso que Pagos guarda en detalle_respuesta (PostgreSQL). */
+    @Query(value = "SELECT * FROM pagos WHERE CAST(detalle_respuesta AS jsonb) -> 'reembolso' ->> 'token' = :token LIMIT 1",
+            nativeQuery = true)
+    Optional<Pago> findByReembolsoToken(@Param("token") String token);
+
+    /** Sin parámetros nulos: el servicio usa límites amplios y '%' cuando el filtro no viene. */
     /**
      * Busca el pago por el token del reembolso que Pagos guarda en
      * detalle_respuesta (PostgreSQL).
@@ -39,6 +45,11 @@ public interface PagoRepository extends JpaRepository<Pago, Long> {
             "AND UPPER(p.reserva.codigoReserva) LIKE :codigoReserva " +
             "ORDER BY p.fechaPago DESC, p.createdAt DESC")
     Page<Pago> findPagadosByUsuarioId(@Param("usuarioId") Long usuarioId,
+                                      @Param("desde") LocalDateTime desde,
+                                      @Param("hasta") LocalDateTime hasta,
+                                      @Param("codigoReserva") String codigoReserva,
+                                      Pageable pageable);
+}
             @Param("desde") LocalDateTime desde,
             @Param("hasta") LocalDateTime hasta,
             @Param("codigoReserva") String codigoReserva,

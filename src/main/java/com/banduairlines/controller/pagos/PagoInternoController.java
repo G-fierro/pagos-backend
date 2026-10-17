@@ -21,6 +21,11 @@ public class PagoInternoController {
     @ResponseStatus(HttpStatus.CREATED)
     public PagoIniciadoResponse iniciarPago(
             @RequestHeader(value = "X-Service-Key", required = false) String serviceKey,
+            @Valid @RequestBody IniciarPagoRequest request
+    ) {
+        return pagoService.iniciarPago(request, serviceKey);
+    }
+}
             @Valid @RequestBody IniciarPagoRequest request) {
         return pagoService.iniciarPago(request, serviceKey);
     }

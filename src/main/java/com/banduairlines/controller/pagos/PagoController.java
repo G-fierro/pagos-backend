@@ -18,9 +18,31 @@ public class PagoController {
         this.pagoService = pagoService;
     }
 
+    @GetMapping("/{pagoId}")
+    public PagoDetalleResponse obtenerPago(
+            @PathVariable Long pagoId,
+            @RequestHeader(value = "X-Compra-Token", required = false) String compraToken
+    ) {
+        return pagoService.obtenerPago(pagoId, compraToken);
+    }
+
     @PostMapping(value = "/notificaciones", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
     @ResponseStatus(HttpStatus.OK)
     public void recibirNotificacionFlow(@RequestParam(value = "token", required = false) String token) {
         pagoService.procesarNotificacionFlow(token);
+    }
+
+    @PostMapping(value = "/retorno", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
+    public ResponseEntity<Void> retornoFlow(@RequestParam(value = "token", required = false) String token) {
+        String destino = pagoService.procesarRetornoFlow(token);
+        return ResponseEntity.status(HttpStatus.SEE_OTHER)
+                .header(HttpHeaders.LOCATION, destino)
+                .build();
+    }
+
+    @PostMapping(value = "/reembolsos/notificaciones", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
+    @ResponseStatus(HttpStatus.OK)
+    public void recibirNotificacionReembolso(@RequestParam(value = "token", required = false) String token) {
+        pagoService.procesarNotificacionReembolso(token);
     }
 }

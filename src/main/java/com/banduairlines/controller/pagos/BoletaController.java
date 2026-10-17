@@ -1,5 +1,7 @@
 package com.banduairlines.controller.pagos;
 
+import com.banduairlines.dto.pagos.BoletaResponse;
+import com.banduairlines.dto.pagos.BoletaResumenResponse;
 import com.banduairlines.dto.pagos.BoletaPdfDto;
 import com.banduairlines.dto.pagos.BoletaResponse;
 import com.banduairlines.dto.pagos.BoletaResumenResponse;
@@ -23,6 +25,25 @@ public class BoletaController {
 
     public BoletaController(PagoService pagoService) {
         this.pagoService = pagoService;
+    }
+
+    @GetMapping("/reservas/{reservaId}/boleta")
+    public BoletaResponse obtenerBoletaPorReserva(
+            @PathVariable Long reservaId,
+            @RequestHeader(value = "X-Compra-Token", required = false) String compraToken
+    ) {
+        return pagoService.obtenerBoletaPorReserva(reservaId, compraToken);
+    }
+
+    @GetMapping("/boletas/historial")
+    public PaginaResponse<BoletaResumenResponse> obtenerHistorial(
+            @RequestParam(value = "pagina", defaultValue = "0") int pagina,
+            @RequestParam(value = "tamano", defaultValue = "10") int tamano,
+            @RequestParam(value = "desde", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate desde,
+            @RequestParam(value = "hasta", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate hasta,
+            @RequestParam(value = "codigoReserva", required = false) String codigoReserva
+    ) {
+        return pagoService.obtenerHistorialBoletas(pagina, tamano, desde, hasta, codigoReserva);
     }
 
     @PostMapping("/boletas/consulta")

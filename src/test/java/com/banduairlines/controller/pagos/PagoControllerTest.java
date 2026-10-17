@@ -49,6 +49,8 @@ class PagoControllerTest {
         PagoDetalleResponse response = new PagoDetalleResponse(
                 10L, 1L, "K7QX2M", EstadoPago.PAGADO, 255320,
                 new MedioPagoDto("Tarjeta de Crédito Visa", "4521"),
+                3849571L, Instant.now(), null, 10L, false
+        );
                 3849571L, Instant.now(), null, 10L, false);
         when(pagoService.obtenerPago(eq(10L), any())).thenReturn(response);
 
@@ -78,6 +80,8 @@ class PagoControllerTest {
         doNothing().when(pagoService).procesarNotificacionFlow("TOKEN_XYZ");
 
         mockMvc.perform(post("/api/v1/pagos/notificaciones")
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .param("token", "TOKEN_XYZ"))
                 .contentType(MediaType.APPLICATION_FORM_URLENCODED)
                 .param("token", "TOKEN_XYZ"))
                 .andExpect(status().isOk());
@@ -90,6 +94,8 @@ class PagoControllerTest {
         when(pagoService.procesarRetornoFlow("TOKEN_XYZ")).thenReturn("/pago/resultado?pagoId=10");
 
         mockMvc.perform(post("/api/v1/pagos/retorno")
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .param("token", "TOKEN_XYZ"))
                 .contentType(MediaType.APPLICATION_FORM_URLENCODED)
                 .param("token", "TOKEN_XYZ"))
                 .andExpect(status().isSeeOther())
@@ -101,10 +107,13 @@ class PagoControllerTest {
         doNothing().when(pagoService).procesarNotificacionReembolso("REF_TOKEN_XYZ");
 
         mockMvc.perform(post("/api/v1/pagos/reembolsos/notificaciones")
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .param("token", "REF_TOKEN_XYZ"))
                 .contentType(MediaType.APPLICATION_FORM_URLENCODED)
                 .param("token", "REF_TOKEN_XYZ"))
                 .andExpect(status().isOk());
 
         verify(pagoService).procesarNotificacionReembolso("REF_TOKEN_XYZ");
     }
+}
 }
