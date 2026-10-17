@@ -1,0 +1,32 @@
+package com.banduairlines.controller.pagos;
+
+import com.banduairlines.dto.pagos.BoletaPdfDto;
+import com.banduairlines.dto.pagos.BoletaResponse;
+import com.banduairlines.dto.pagos.BoletaResumenResponse;
+import com.banduairlines.dto.pagos.ConsultaBoletaInvitadoRequest;
+import com.banduairlines.dto.pagos.PaginaResponse;
+import com.banduairlines.service.pagos.PagoService;
+import jakarta.validation.Valid;
+import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.time.LocalDate;
+
+@RestController
+@RequestMapping("/api/v1/pagos")
+public class BoletaController {
+
+    private final PagoService pagoService;
+
+    public BoletaController(PagoService pagoService) {
+        this.pagoService = pagoService;
+    }
+
+    @PostMapping("/boletas/consulta")
+    public BoletaResponse consultarBoletaInvitado(@Valid @RequestBody ConsultaBoletaInvitadoRequest request) {
+        return pagoService.consultarBoletaInvitado(request);
+    }
+}
