@@ -10,24 +10,13 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/v1/pagos")
-
-public class PagoController{
-
+public class PagoController {
 
 
 
-
-
-
-    @PostMapping(value = "/retorno", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
-    public ResponseEntity<Void> retornoFlow(@RequestParam(value = "token", required = false) String token) {
-        String destino = pagoService.procesarRetornoFlow(token);
-        return ResponseEntity.status(HttpStatus.SEE_OTHER)
-                .header(HttpHeaders.LOCATION, destino)
-                .build();
+    @PostMapping(value = "/reembolsos/notificaciones", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
+    @ResponseStatus(HttpStatus.OK)
+    public void recibirNotificacionReembolso(@RequestParam(value = "token", required = false) String token) {
+        pagoService.procesarNotificacionReembolso(token);
     }
-
-
-
-
 }
